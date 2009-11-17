@@ -1,0 +1,2 @@
+e6c68c0e082b5af36e208bed84523330706bcfd7 99631cfe0f3fb1df97bfcd496c135e147e607ce5 Daniel Fiser <danfis@danfis.cz> 1251917202 +0200	pull : Fast forward
+99631cfe0f3fb1df97bfcd496c135e147e607ce5 83f9bed114df8ada0fc75c59d6675e8fa0982b3c Daniel Fiser <danfis@danfis.cz> 1251917553 +0200	commit: Fixed chooseParser(In &, const char *) function.

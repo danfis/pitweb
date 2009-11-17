@@ -1,0 +1,8 @@
+#!/bin/bash
+
+PWD=`pwd`
+P="$PWD/../"
+if ! (echo "$PYTHONPATH" | grep "$P"); then
+    export PYTHONPATH="$P:$PYTHONPATH";
+fi
+

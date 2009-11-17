@@ -1,0 +1,18 @@
+#!/bin/bash
+
+
+PY="
+#!/usr/bin/env python
+
+import pstats
+
+profile_file = '.profile.stat'
+
+if __name__ == '__main__':
+    p = pstats.Stats(profile_file)
+    p.sort_stats('cumulative')
+    p.print_stats('/t/')
+
+"
+
+echo "$PY" | python | less
