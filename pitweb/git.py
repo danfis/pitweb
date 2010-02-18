@@ -126,6 +126,20 @@ class GitComm(object):
         return self._git(comm)
 
 
+    def lsTree(self, obj = 'HEAD', recursive = False, long = False,
+                     full_tree = False):
+        comm = ['ls-tree']
+
+        if recursive:
+            comm.append('-r')
+        if long:
+            comm.append('--long')
+        if full_tree:
+            comm.append('--full-tree')
+
+        comm.append(obj)
+        return self._git(comm)
+
 if __name__ == '__main__':
     git = GitComm('../.git')
 

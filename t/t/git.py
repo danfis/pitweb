@@ -56,3 +56,9 @@ class TestGitComm(unittest.TestCase):
              'containing type not pointer to type.\n']
         for l in o:
             self.assertTrue(l in c)
+
+    def testLsTree(self):
+        o = self.git.lsTree()
+        for l in o: print l,
+        # TODO
+

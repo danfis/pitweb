@@ -1,14 +1,14 @@
 import string
 import unittest
 
-import git
+import git, project
 
 def moduleName(m):
     n = m.__name__
     n = string.split(n, '.')
     return n[-1]
 
-modules = [git]
+modules = [git, project]
 
 
 __all__ = ['suite']
