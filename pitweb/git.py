@@ -1,4 +1,23 @@
+import re
+import datetime
 from subprocess import Popen, PIPE, STDOUT
+
+basic_patterns = {
+    'id' : r'[0-9a-fA-F]{40}',
+    'epoch' : r'[0-9]+',
+    'tz'    : r'\+[0-9]+',
+}
+
+patterns = {
+    'person' : re.compile(r'[^ ]* (.*) ({epoch}) ({tz})$'.format(**basic_patterns)),
+    'rev-list' : {
+        'header'   : re.compile(r'^({0})( {0})*'.format(basic_patterns['id'])),
+        'tree'     : re.compile(r'^tree ({0})$'.format(basic_patterns['id'])),
+        'parent'   : re.compile(r'^parent ({0})$'.format(basic_patterns['id'])),
+        'author'   : re.compile(r'^author (.*) ({epoch}) ({tz})$'.format(**basic_patterns)),
+        'committer' : re.compile(r'^committer (.*) ({epoch}) ({tz})$'.format(**basic_patterns)),
+    },
+}
 
 #Interrogation commands
 #
@@ -71,19 +90,17 @@ class GitComm(object):
         repository is located (see doc of git --git-dir).
     """
 
-    def __init__(self, dir, git = None):
+    def __init__(self, dir, gitbin = '/usr/bin/git'):
         self._dir = dir
-        self._gitbin = '/usr/bin/git'
-
-        if git is not None:
-            self._gitbin = GIT
+        self._gitbin = gitbin
 
     def _git(self, args):
         comm = [self._gitbin, '--git-dir={0}'.format(self._dir)]
         comm.extend(args)
 
         pipe = Popen(comm, stdout = PIPE, stderr = STDOUT)
-        out = pipe.stdout.readlines()
+        #out = pipe.stdout.readlines()
+        out = pipe.stdout.read()
         pipe.stdout.close()
 
         return out
@@ -139,6 +156,144 @@ class GitComm(object):
 
         comm.append(obj)
         return self._git(comm)
+
+
+class GitDate(object):
+    def __init__(self, epoch, tz):
+        self.gmt      = None
+        self.local    = None
+        self.local_tz = None
+
+        self._parseEpochTz(epoch, tz)
+
+    def __str__(self):
+        date = ''
+        if self.local:
+            date += self.local.strftime('%Y-%m-%d %H:%M:%S')
+        if self.local_tz:
+            date += ' ' + self.local_tz
+
+        return '<GitDate {0}>'.format(date)
+    def str(self):
+        date = ''
+        if self.local:
+            date += self.local.strftime('%Y-%m-%d %H:%M:%S')
+        if self.local_tz:
+            date += ' ' + self.local_tz
+
+        return date
+
+    def _parseEpochTz(self, epoch, tz):
+        epoch = int(epoch)
+
+        # prepare gmt epoch
+        h = int(tz[1:3])
+        m = int(tz[4:])
+        if tz[0] == '+':
+            gmtepoch = epoch - ((h + m/60) * 3600)
+        else:
+            gmtepoch = epoch + ((h + m/60) * 3600)
+
+        date = datetime.datetime.fromtimestamp(epoch)
+        gmtdate = datetime.datetime.fromtimestamp(gmtepoch)
+
+        self.gmt      = gmtdate
+        self.local    = date
+        self.local_tz = tz
+
+class GitPerson(object):
+    def __init__(self, person, date):
+        self.person = person
+        self.date   = date
+
+    def __str__(self):
+        return '<GitPerson person={0}, date={1}>'.format(self.person, str(self.date))
+
+class GitObj(object):
+    def __init__(self, git, id = None):
+        self.git = git
+        self.id  = id
+
+    def __str__(self):
+        return '<{0} id={1}>'.format(self.__class__.__name__, self.id)
+
+class GitCommit(GitObj):
+    def __init__(self, git, id, tree, parents, author, committer, comment):
+        super(GitCommit, self).__init__(git, id)
+
+        self.tree      = tree
+        self.parents   = parents
+        self.author    = author
+        self.committer = committer
+        self.comment   = comment
+
+    def commentFirstLine(self):
+        lines = self.comment.split('\n')
+        return lines[0]
+
+class Git(object):
+    def __init__(self, dir, gitbin = '/usr/bin/git'):
+        global patterns
+
+        self._git = GitComm(dir, gitbin)
+        self._patterns = patterns
+
+    def revList(self, obj = 'HEAD', max_count = -1):
+
+        # get raw data
+        res = self._git.revList(obj, parents = True, header = True,
+                                     max_count = max_count)
+
+        # split into hunks (each corresponding with one commit)
+        commits_str = res.split('\x00')
+
+        # create GitCommit object from each string hunk
+        commits = []
+        for commit_str in commits_str:
+            if len(commit_str) > 1:
+                commits.append(self._parseCommit(commit_str))
+
+        return commits
+
+    def _parsePerson(self, line):
+        match = self._patterns['person'].match(line)
+        date   = GitDate(epoch = match.group(2), tz = match.group(3))
+        person = GitPerson(person = match.group(1), date = date)
+        return person
+
+    def _parseIdParents(self, line):
+        ids = line.split(' ')
+        id      = ids[0]
+        parents = []
+        if len(ids) > 1:
+            parents = ids[1:]
+        return (id, parents, )
+
+    def _parseCommit(self, s):
+        lines = s.split('\n')
+
+        id, parents = self._parseIdParents(lines.pop(0))
+        tree        = None
+        author      = None
+        committer   = None
+        comment     = ''
+        for line in lines:
+            if line[:4] == 'tree':
+                tree = line[5:]
+            if line[:6] == 'parent' and line[7:] not in parents:
+                parents.append(line[7:])
+            if line[:6] == 'author':
+                author = self._parsePerson(line)
+            if line[:9] == 'committer':
+                committer = self._parsePerson(line)
+
+            if line[:4] == '    ':
+                comment += line[4:] + '\n'
+
+        commit = GitCommit(self, id = id, tree = tree, parents = parents,
+                                 author = author, committer = committer,
+                                 comment = comment)
+        return commit
 
 if __name__ == '__main__':
     git = GitComm('../.git')

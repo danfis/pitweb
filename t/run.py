@@ -12,7 +12,7 @@ suite = unittest.TestSuite()
 
 
 if len(sys.argv) > 1:
-    if not db.suite.has_key(sys.argv[1]):
+    if not t.suite.has_key(sys.argv[1]):
         print >>sys.stderr, "{0}: No such suite available".format(sys.argv[1])
         sys.exit(-1)
 

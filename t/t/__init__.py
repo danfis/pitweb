@@ -8,7 +8,7 @@ def moduleName(m):
     n = string.split(n, '.')
     return n[-1]
 
-modules = [git, project]
+modules = [git]
 
 
 __all__ = ['suite']
