@@ -166,6 +166,9 @@ class GitDate(object):
 
         self._parseEpochTz(epoch, tz)
 
+    def format(self, format):
+        return self.local.strftime(format)
+
     def __str__(self):
         date = ''
         if self.local:
@@ -239,7 +242,6 @@ class Git(object):
         self._patterns = patterns
 
     def revList(self, obj = 'HEAD', max_count = -1):
-
         # get raw data
         res = self._git.revList(obj, parents = True, header = True,
                                      max_count = max_count)
@@ -254,6 +256,10 @@ class Git(object):
                 commits.append(self._parseCommit(commit_str))
 
         return commits
+
+    def tags(self):
+        # cmod = "git for-each-ref --format='%(objectname) %(objecttype) %(refname)' --sort='-*authordate' refs/tags"
+        pass
 
     def _parsePerson(self, line):
         match = self._patterns['person'].match(line)
