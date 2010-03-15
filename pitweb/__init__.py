@@ -1,3 +1,1 @@
-from project import Project
-
-__all__  = ['Project']
+__all__  = []

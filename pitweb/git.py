@@ -123,8 +123,23 @@ class GitComm(object):
         comm.append(obj)
         return self._git(comm)
 
+    def forEachRef(self, format = None, sort = None, pattern = ''):
+        """ git-for-each-ref(1)
+                Output information on each ref.
+        """
 
-    def catFile(self, obj = 'HEAD', type = False, size = False,
+        comm = ['for-each-ref']
+
+        if format:
+            comm.append('--format={0}'.format(format))
+        if sort:
+            comm.append('--sort={0}'.format(sort))
+
+        comm.append(pattern)
+        return self._git(comm)
+
+
+    def catFile(self, obj = 'HEAD', type = 'commit', size = False,
                       pretty = False):
         """ git-cat-file(1)
                 Provide content or type and size information for repository objects.
@@ -132,8 +147,10 @@ class GitComm(object):
 
         comm = ['cat-file']
 
-        if type:
-            comm.append('-t')
+        comm.append(type)
+
+        #if type:
+        #    comm.append('-t')
         if size:
             comm.append('-s')
         if pretty:
@@ -241,6 +258,15 @@ class GitCommit(GitObj):
 
         return lines[1]
 
+class GitTag(GitObj):
+    def __init__(self, git, id, objid = None, name = '', msg = ''):
+        super(GitTag, self).__init__(git, id)
+
+        self.objid = objid
+        self.name  = name
+        self.msg   = msg
+
+
 class Git(object):
     def __init__(self, dir, gitbin = '/usr/bin/git'):
         global patterns
@@ -265,8 +291,21 @@ class Git(object):
         return commits
 
     def tags(self):
-        # cmod = "git for-each-ref --format='%(objectname) %(objecttype) %(refname)' --sort='-*authordate' refs/tags"
-        pass
+        format  = '%(objectname)'
+        sort    = '-*authordate'
+        pattern = 'refs/tags'
+
+        # get raw data
+        res = self._git.forEachRef(format = format, sort = sort, pattern = pattern)
+
+        tags = []
+
+        tagids = res.split('\n')
+        for tagid in tagids:
+            s = self._git.catFile(tagid, type = 'tag')
+            tags.append(self._parseTag(tagid, s))
+
+        return tags
 
     def _parsePerson(self, line):
         match = self._patterns['person'].match(line)
@@ -307,6 +346,28 @@ class Git(object):
                                  author = author, committer = committer,
                                  comment = comment)
         return commit
+
+    def _parseTag(self, id, s):
+        lines = s.split('\n')
+
+        readmsg = False
+
+        objid = ''
+        name  = ''
+        msg   = ''
+
+        for line in lines:
+            if readmsg:
+                msg += line
+            elif line[:6] == 'object':
+                objid = line[7:]
+            elif line[:4] == 'tag ':
+                name = line[4:]
+            elif len(line) == 0:
+                readmsg = True
+                
+        tag = GitTag(self, id = id, objid = objid, name = name, msg = msg)
+        return tag
 
 if __name__ == '__main__':
     git = GitComm('../.git')

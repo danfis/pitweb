@@ -1,7 +1,7 @@
 import string
 import unittest
 
-import git, project
+import git
 
 def moduleName(m):
     n = m.__name__

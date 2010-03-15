@@ -119,6 +119,8 @@ class Project(ProjectBase):
         commits = self._git.revList(id, max_count = max_count)
         commits = commits[self._commits_per_page * (page - 1):]
 
+        tags = self._git.tags()
+
         cdata = []
         for commit in commits:
             d = { 'id'          : commit.id,
@@ -130,6 +132,11 @@ class Project(ProjectBase):
                   'tags'        : [],
                   'branches'    : [],
                 }
+
+            for t in tags:
+                if t.objid == commit.id:
+                    d['tags'].append({ 'id'   : t.id,
+                                       'name' : t.name })
 
             if showmsg:
                 d['longcomment'] = '<br />' + commit.commentRestLines().replace('\n', '<br />') + '<br />'
@@ -223,11 +230,17 @@ class Project(ProjectBase):
         '''.format(expand)
 
         for d in commits:
-            html += '''
+            h = '''
         <tr>
             <td>{date}</td>
             <td><i>{author}</i></td>
             <td><a href="?a=commit;id={id}" class="comment">{comment}</a>
+            '''
+
+            for t in d['tags']:
+                h += '<a href="?a=log;id={id}" class="tag">{name}</a>'.format(**t)
+
+            h += '''
                 {longcomment}
             </td>
             <td><a href="?a=commit;id={id}">commit</a></td>
@@ -235,7 +248,9 @@ class Project(ProjectBase):
             <td><a href="?a=tree;id={tree};parent={id}">tree</a></td>
             <td><a href="?a=snapshot;id={id}">snapshot</a></td>
         </tr>
-'''.format(**d)
+        '''
+
+            html += h.format(**d)
         html += '</table>'
 
         html += nav
