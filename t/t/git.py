@@ -95,3 +95,8 @@ class TestGit(unittest.TestCase):
         self.assertEqual(tags[2].id, 'b1429eb9183615662b345e5858409859d426b898')
         self.assertEqual(tags[2].objid, '308518fb9bbeb36151ed04d352aa96d514df8826')
         self.assertEqual(tags[2].name, 'v1.0')
+
+    def testHeads(self):
+        heads = self.git.heads()
+        self.assertEqual(heads[0].id, '83f9bed114df8ada0fc75c59d6675e8fa0982b3c')
+        self.assertEqual(heads[0].name, 'master')

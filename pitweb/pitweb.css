@@ -6,6 +6,12 @@ a:hover { text-decoration: underline; }
 a.tag { display: block-inline; background-color: #ffffaa; border: 1px solid #f1ee00; color: black;
         margin-left: 2px; margin-right: 2px;
         padding-left: 4px; padding-right: 4px; padding-top: 1px; padding-bottom: 1px; }
+a.branch { display: block-inline; background-color: #88ff88; border: 1px solid #39ba39; color: black;
+           margin-left: 2px; margin-right: 2px;
+           padding-left: 4px; padding-right: 4px; padding-top: 1px; padding-bottom: 1px; }
+a.remote { display: block-inline; background-color: #AAAAFF; border: 1px solid #8888ff; color: black;
+           margin-left: 2px; margin-right: 2px;
+           padding-left: 4px; padding-right: 4px; padding-top: 1px; padding-bottom: 1px; }
 
 div.header { padding: 7px; margin-bottom: 20px; font-size: 20px; background-color: #edece6; }
 div.header .project { font-size: 18px; }

@@ -123,7 +123,7 @@ class GitComm(object):
         comm.append(obj)
         return self._git(comm)
 
-    def forEachRef(self, format = None, sort = None, pattern = ''):
+    def forEachRef(self, format = None, sort = None, pattern = None):
         """ git-for-each-ref(1)
                 Output information on each ref.
         """
@@ -135,7 +135,8 @@ class GitComm(object):
         if sort:
             comm.append('--sort={0}'.format(sort))
 
-        comm.append(pattern)
+        if pattern:
+            comm.append(pattern)
         return self._git(comm)
 
 
@@ -266,6 +267,12 @@ class GitTag(GitObj):
         self.name  = name
         self.msg   = msg
 
+class GitHead(GitObj):
+    def __init__(self, git, id, name = ''):
+        super(GitHead, self).__init__(git, id)
+
+        self.name  = name
+
 
 class Git(object):
     def __init__(self, dir, gitbin = '/usr/bin/git'):
@@ -306,6 +313,44 @@ class Git(object):
             tags.append(self._parseTag(tagid, s))
 
         return tags
+
+    def _heads_remotes(self, identif):
+        ilen = len(identif)
+
+        format  = '%(objectname) %(objecttype) %(refname)'
+        sort    = '-*authordate'
+
+        # get raw data
+        res = self._git.forEachRef(format = format, sort = sort)
+
+        heads = []
+
+        lines = res.split('\n')
+        for line in lines:
+            d = line.split(' ')
+            if len(d) != 3:
+                continue
+
+            if d[1] != 'commit':
+                continue
+
+            if d[2][:ilen] != identif:
+                continue
+
+            id = d[0]
+            name = d[2][ilen:]
+
+            head = GitHead(self, id, name = name)
+            heads.append(head)
+
+        return heads
+
+    def heads(self):
+        return self._heads_remotes('refs/heads/')
+
+    def remotes(self):
+        return self._heads_remotes('refs/remotes/')
+
 
     def _parsePerson(self, line):
         match = self._patterns['person'].match(line)

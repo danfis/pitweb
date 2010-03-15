@@ -119,7 +119,9 @@ class Project(ProjectBase):
         commits = self._git.revList(id, max_count = max_count)
         commits = commits[self._commits_per_page * (page - 1):]
 
-        tags = self._git.tags()
+        tags     = self._git.tags()
+        branches = self._git.heads()
+        remotes  = self._git.remotes()
 
         cdata = []
         for commit in commits:
@@ -131,12 +133,24 @@ class Project(ProjectBase):
                   'tree'        : commit.tree,
                   'tags'        : [],
                   'branches'    : [],
+                  'remotes'     : [],
                 }
 
             for t in tags:
                 if t.objid == commit.id:
                     d['tags'].append({ 'id'   : t.id,
                                        'name' : t.name })
+
+            for b in branches:
+                if b.id == commit.id:
+                    d['branches'].append({ 'id'   : b.id,
+                                           'name' : b.name })
+
+            for r in remotes:
+                if r.id == commit.id:
+                    d['remotes'].append({ 'id'   : r.id,
+                                          'name' : r.name })
+
 
             if showmsg:
                 d['longcomment'] = '<br />' + commit.commentRestLines().replace('\n', '<br />') + '<br />'
@@ -154,7 +168,7 @@ class Project(ProjectBase):
     def tpl(self, content):
         header = '<span class="project">{project_name}</span>'.format(project_name = self._project_name)
 
-        sections = ['summary', 'log', 'commit']
+        sections = ['summary', 'log', 'refs', 'commit', 'diff', 'tree']
         menu = ''
         for sec in sections:
             menu += '<a href="?a={0}"'.format(sec)
@@ -216,6 +230,8 @@ class Project(ProjectBase):
 
         html += nav
 
+
+        # Log list
         html += '''
 <table class="log">
         <tr class="log_header">
@@ -237,8 +253,14 @@ class Project(ProjectBase):
             <td><a href="?a=commit;id={id}" class="comment">{comment}</a>
             '''
 
+            for b in d['branches']:
+                h += '<a href="?a=log;id={id}" class="branch">{name}</a>'.format(**b)
+
             for t in d['tags']:
                 h += '<a href="?a=log;id={id}" class="tag">{name}</a>'.format(**t)
+
+            for r in d['remotes']:
+                h += '<a href="?a=log;id={id}" class="remote">remotes/{name}</a>'.format(**r)
 
             h += '''
                 {longcomment}
