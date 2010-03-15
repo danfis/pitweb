@@ -231,8 +231,15 @@ class GitCommit(GitObj):
         self.comment   = comment
 
     def commentFirstLine(self):
-        lines = self.comment.split('\n')
+        lines = self.comment.split('\n', 1)
         return lines[0]
+
+    def commentRestLines(self):
+        lines = self.comment.split('\n', 1)
+        if len(lines) == 1:
+            return ''
+
+        return lines[1]
 
 class Git(object):
     def __init__(self, dir, gitbin = '/usr/bin/git'):
