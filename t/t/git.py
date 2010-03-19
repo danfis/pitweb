@@ -85,18 +85,10 @@ class TestGit(unittest.TestCase):
         #    print commit.comment
         #    print commit.author
 
-    def testTags(self):
-        tags = self.git.tags()
-
-        self.assertEqual(tags[0].id, 'f592a41ff8b1dbb76f6b185ebc291605eae1e66d')
-        self.assertEqual(tags[0].objid, '83f9bed114df8ada0fc75c59d6675e8fa0982b3c')
-        self.assertEqual(tags[0].name, 'v1.2')
-
-        self.assertEqual(tags[2].id, 'b1429eb9183615662b345e5858409859d426b898')
-        self.assertEqual(tags[2].objid, '308518fb9bbeb36151ed04d352aa96d514df8826')
-        self.assertEqual(tags[2].name, 'v1.0')
-
     def testHeads(self):
-        heads = self.git.heads()
-        self.assertEqual(heads[0].id, '83f9bed114df8ada0fc75c59d6675e8fa0982b3c')
-        self.assertEqual(heads[0].name, 'master')
+        tags, heads, remotes = self.git.refs()
+        #print tags
+        #print heads
+        #print remotes
+        #for tag in tags:
+        #    print tag.id, tag.name

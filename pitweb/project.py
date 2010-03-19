@@ -113,56 +113,121 @@ class Project(ProjectBase):
     def __init__(self, dir, req):
         super(Project, self).__init__(dir, req)
 
+        self._tags, self._heads, self._remotes = self._git.refs()
+
+
+    def anchor(self, html, cls, v):
+        href = '?'
+        for k in v:
+            href += '{k}={v};'.format(k = k, v = v[k])
+
+        app = ''
+        if cls and len(cls) > 0:
+            app += ' class="{0}"'.format(cls)
+
+        return '<a href="{href}"{app}>{html}</a>'.format(html = html, href = href, app = app)
+
+
+    def anchorLog(self, html, id, showmsg, page, cls = ''):
+        if showmsg:
+            showmsg = '1'
+        else:
+            showmsg = '0'
+        return self.anchor(html, cls = cls, v = { 'a' : 'log', 'id' : id, 'showmsg' : showmsg, 'page' : page })
+
 
     def log(self, id = 'HEAD', showmsg = False, page = 1):
         max_count = self._commits_per_page * page;
         commits = self._git.revList(id, max_count = max_count)
         commits = commits[self._commits_per_page * (page - 1):]
 
-        tags     = self._git.tags()
-        branches = self._git.heads()
-        remotes  = self._git.remotes()
+        commits = self._git.commitsSetRefs(commits, self._tags, self._heads, self._remotes)
 
-        cdata = []
+        html = ''
+
+        if not showmsg:
+            expand = self.anchorLog('Expand', id, not showmsg, page)
+        else:
+            expand = self.anchorLog('Collapse', id, not showmsg, page)
+
+        # Navigation
+        nav = ''
+        nav += '<div class="log_nav">'
+        if page <= 1:
+            nav += '<span>prev</span>'
+        else:
+            nav += self.anchorLog('prev', id, showmsg, page - 1)
+
+        nav += '<span class="sep">|</span>'
+
+        nav += self.anchorLog('next', id, showmsg, page + 1)
+        nav += '</div>'
+
+        html += nav
+
+
+        # Log list
+        html += '''
+<table class="log">
+        <tr class="log_header">
+            <td>Age</td>
+            <td>Author</td>
+            <td>Commit message ({0})</td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+        </tr>
+        '''.format(expand)
+
         for commit in commits:
-            d = { 'id'          : commit.id,
-                  'author'      : commit.author.person,
-                  'date'        : commit.author.date.format('%Y-%m-%d'),
-                  'comment'     : commit.commentFirstLine(),
-                  'longcomment' : '',
-                  'tree'        : commit.tree,
-                  'tags'        : [],
-                  'branches'    : [],
-                  'remotes'     : [],
-                }
 
-            for t in tags:
-                if t.objid == commit.id:
-                    d['tags'].append({ 'id'   : t.id,
-                                       'name' : t.name })
+            h = '''
+        <tr>
+            <td>{date}</td>
+            <td><i>{author}</i></td>
+            <td>'''
 
-            for b in branches:
-                if b.id == commit.id:
-                    d['branches'].append({ 'id'   : b.id,
-                                           'name' : b.name })
+            line = commit.commentFirstLine()
+            line = line.replace('{', '{{')
+            line = line.replace('}', '}}')
 
-            for r in remotes:
-                if r.id == commit.id:
-                    d['remotes'].append({ 'id'   : r.id,
-                                          'name' : r.name })
+            h += self.anchorLog(line, commit.id, showmsg, page, cls = 'comment')
 
+            for b in commit.heads:
+                h += self.anchorLog(b.name, b.id, showmsg, page, cls = "branch")
 
+            for t in commit.tags:
+                h += self.anchorLog(t.name, t.id, showmsg, page, cls = "tag")
+
+            for r in commit.remotes:
+                h += self.anchorLog('remotes/' + r.name, r.id, showmsg, page, cls = "remote")
+
+            h += '''
+                {longcomment}
+            </td>
+            <td><a href="?a=commit;id={id}">commit</a></td>
+            <td><a href="?a=diff;id={id}">diff</a></td>
+            <td><a href="?a=tree;id={tree};parent={id}">tree</a></td>
+            <td><a href="?a=snapshot;id={id}">snapshot</a></td>
+        </tr>
+        '''
+
+            longcomment = ''
             if showmsg:
-                d['longcomment'] = '<br />' + commit.commentRestLines().replace('\n', '<br />') + '<br />'
+                longcomment = '<br />' + commit.commentRestLines().replace('\n', '<br />') + '<br />'
 
-            cdata.append(d)
+            html += h.format(id          = commit.id,
+                             author      = commit.author.person,
+                             date        = commit.author.date.format('%Y-%m-%d'),
+                             longcomment = longcomment,
+                             tree        = commit.tree)
+        html += '</table>'
 
-        data = { 'id'      : id,
-                 'showmsg' : showmsg,
-                 'page'    : page,
-               }
+        html += nav
 
-        self.write(self.tplLog(data, cdata))
+        self.write(self.tpl(html))
+
 
 
     def tpl(self, content):
@@ -197,84 +262,3 @@ class Project(ProjectBase):
 '''.format(project_name = self._project_name, header = header, menu = menu, content = content)
         return html
 
-    def tplLog(self, data, commits):
-        html = ''
-
-        if not data['showmsg']:
-            expand = '<a href="?a=log;id={id};showmsg=1">Expand</a>'.format(**data)
-        else:
-            expand = '<a href="?a=log;id={id};showmsg=0">Collapse</a>'.format(**data)
-
-        # Navigation
-        nav = ''
-        nav += '<div class="log_nav">'
-        if data['page'] <= 1:
-            nav += '<span>prev</span>'
-        else:
-            a = '<a href="?a=log;id={id};showmsg={showmsg};page={page}">prev</a>'
-            showmsg = '0'
-            if data['showmsg']:
-                showmsg = '1'
-            a = a.format(id = data['id'], showmsg = showmsg, page = data['page'] - 1)
-            nav += a
-
-        nav += '<span class="sep">|</span>'
-
-        a = '<a href="?a=log;id={id};showmsg={showmsg};page={page}">next</a>'
-        showmsg = '0'
-        if data['showmsg']:
-            showmsg = '1'
-        a = a.format(id = data['id'], showmsg = showmsg, page = data['page'] + 1)
-        nav += a
-        nav += '</div>'
-
-        html += nav
-
-
-        # Log list
-        html += '''
-<table class="log">
-        <tr class="log_header">
-            <td>Age</td>
-            <td>Author</td>
-            <td>Commit message ({0})</td>
-            <td></td>
-            <td></td>
-            <td></td>
-            <td></td>
-        </tr>
-        '''.format(expand)
-
-        for d in commits:
-            h = '''
-        <tr>
-            <td>{date}</td>
-            <td><i>{author}</i></td>
-            <td><a href="?a=commit;id={id}" class="comment">{comment}</a>
-            '''
-
-            for b in d['branches']:
-                h += '<a href="?a=log;id={id}" class="branch">{name}</a>'.format(**b)
-
-            for t in d['tags']:
-                h += '<a href="?a=log;id={id}" class="tag">{name}</a>'.format(**t)
-
-            for r in d['remotes']:
-                h += '<a href="?a=log;id={id}" class="remote">remotes/{name}</a>'.format(**r)
-
-            h += '''
-                {longcomment}
-            </td>
-            <td><a href="?a=commit;id={id}">commit</a></td>
-            <td><a href="?a=diff;id={id}">diff</a></td>
-            <td><a href="?a=tree;id={tree};parent={id}">tree</a></td>
-            <td><a href="?a=snapshot;id={id}">snapshot</a></td>
-        </tr>
-        '''
-
-            html += h.format(**d)
-        html += '</table>'
-
-        html += nav
-
-        return self.tpl(html)

@@ -248,6 +248,10 @@ class GitCommit(GitObj):
         self.committer = committer
         self.comment   = comment
 
+        self.tags    = []
+        self.heads   = []
+        self.remotes = []
+
     def commentFirstLine(self):
         lines = self.comment.split('\n', 1)
         return lines[0]
@@ -297,33 +301,16 @@ class Git(object):
 
         return commits
 
-    def tags(self):
-        format  = '%(objectname)'
-        sort    = '-*authordate'
-        pattern = 'refs/tags'
-
-        # get raw data
-        res = self._git.forEachRef(format = format, sort = sort, pattern = pattern)
-
-        tags = []
-
-        tagids = res.split('\n')
-        for tagid in tagids:
-            s = self._git.catFile(tagid, type = 'tag')
-            tags.append(self._parseTag(tagid, s))
-
-        return tags
-
-    def _heads_remotes(self, identif):
-        ilen = len(identif)
-
+    def refs(self):
         format  = '%(objectname) %(objecttype) %(refname)'
         sort    = '-*authordate'
 
         # get raw data
         res = self._git.forEachRef(format = format, sort = sort)
 
-        heads = []
+        tags    = []
+        heads   = []
+        remotes = []
 
         lines = res.split('\n')
         for line in lines:
@@ -331,25 +318,37 @@ class Git(object):
             if len(d) != 3:
                 continue
 
-            if d[1] != 'commit':
-                continue
+            if d[1] == 'tag':
+                s = self._git.catFile(d[0], type = 'tag')
+                tags.append(self._parseTag(d[0], s))
+            elif d[2][:11] == 'refs/heads/':
+                id = d[0]
+                name = d[2][11:]
+                o = GitHead(self, id, name = name)
+                heads.append(o)
+            elif d[2][:13] == 'refs/remotes/':
+                id = d[0]
+                name = d[2][13:]
+                o = GitHead(self, id, name = name)
+                remotes.append(o)
 
-            if d[2][:ilen] != identif:
-                continue
+        return (tags, heads, remotes, )
 
-            id = d[0]
-            name = d[2][ilen:]
+    def commitsSetRefs(self, commits, tags, heads, remotes):
+        for c in commits:
+            for t in tags:
+                if t.objid == c.id:
+                    c.tags.append(t)
 
-            head = GitHead(self, id, name = name)
-            heads.append(head)
+            for h in heads:
+                if h.id == c.id:
+                    c.heads.append(t)
 
-        return heads
+            for r in remotes:
+                if r.id == c.id:
+                    c.remotes.append(r)
 
-    def heads(self):
-        return self._heads_remotes('refs/heads/')
-
-    def remotes(self):
-        return self._heads_remotes('refs/remotes/')
+        return commits
 
 
     def _parsePerson(self, line):
