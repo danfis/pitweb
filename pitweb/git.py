@@ -10,6 +10,7 @@ basic_patterns = {
 
 patterns = {
     'person' : re.compile(r'[^ ]* (.*) ({epoch}) ({tz})$'.format(**basic_patterns)),
+    'person2' : re.compile(r'(.*) <(.*)>'),
     'rev-list' : {
         'header'   : re.compile(r'^({0})( {0})*'.format(basic_patterns['id'])),
         'tree'     : re.compile(r'^tree ({0})$'.format(basic_patterns['id'])),
@@ -234,6 +235,13 @@ class GitPerson(object):
 
     def __str__(self):
         return '<GitPerson person={0}, date={1}>'.format(self.person, str(self.date))
+
+    def name(self):
+        global patterns
+        m = patterns['person2'].match(self.person)
+        if not m:
+            return self.person
+        return m.group(1)
 
 class GitObj(object):
     def __init__(self, git, id = None):

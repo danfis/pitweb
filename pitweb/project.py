@@ -223,7 +223,7 @@ class Project(ProjectBase):
                 longcomment = '<br />' + commit.commentRestLines().replace('\n', '<br />') + '<br />'
 
             html += h.format(id          = commit.id,
-                             author      = commit.author.person,
+                             author      = commit.author.name(),
                              date        = commit.author.date.format('%Y-%m-%d'),
                              longcomment = longcomment,
                              tree        = commit.tree)
@@ -302,7 +302,7 @@ class Project(ProjectBase):
             html += '<tr>'
             html += '<td>' + nameanchor + '</td>'
             html += '<td>' + commanchor + '</td>'
-            html += '<td><i>' + comm.author.person + '</i></td>'
+            html += '<td><i>' + comm.author.name() + '</i></td>'
             html += '<td>' + comm.author.date.format('%Y-%m-%d') + '</td>'
             html += '<td>' + '</td>'
             html += '</tr>'
@@ -333,7 +333,7 @@ class Project(ProjectBase):
             html += '<tr>'
             html += '<td>' + nameanchor + '</td>'
             html += '<td>' + t.msg + '</td>'
-            html += '<td><i>' + t.tagger.person + '</i></td>'
+            html += '<td><i>' + t.tagger.name() + '</i></td>'
             html += '<td>' + t.tagger.date.format('%Y-%m-%d') + '</td>'
             html += '<td>' + '</td>'
             html += '</tr>'
@@ -372,7 +372,7 @@ class Project(ProjectBase):
             html += '<tr>'
             html += '<td>' + nameanchor + '</td>'
             html += '<td>' + commanchor + '</td>'
-            html += '<td><i>' + comm.author.person + '</i></td>'
+            html += '<td><i>' + comm.author.name() + '</i></td>'
             html += '<td>' + comm.author.date.format('%Y-%m-%d') + '</td>'
             html += '<td>' + '</td>'
             html += '</tr>'
@@ -429,7 +429,7 @@ class Project(ProjectBase):
         '''
 
             html += h.format(id          = commit.id,
-                             author      = commit.author.person,
+                             author      = commit.author.name(),
                              date        = commit.author.date.format('%Y-%m-%d'),
                              tree        = commit.tree)
         html += '</table>'
