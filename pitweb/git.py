@@ -360,7 +360,7 @@ class Git(object):
 
             for h in heads:
                 if h.id == c.id:
-                    c.heads.append(t)
+                    c.heads.append(h)
 
             for r in remotes:
                 if r.id == c.id:
