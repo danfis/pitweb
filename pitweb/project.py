@@ -68,6 +68,9 @@ class ProjectBase(object):
         if self._a == 'log':
             self._section = 'log'
             self.log(id = self._id, showmsg = self._showmsg, page = self._page)
+        elif self._a == 'refs':
+            self._section = 'refs'
+            self.refs()
         elif self._a == 'summary':
             pass
 
@@ -141,7 +144,8 @@ class Project(ProjectBase):
         commits = self._git.revList(id, max_count = max_count)
         commits = commits[self._commits_per_page * (page - 1):]
 
-        commits = self._git.commitsSetRefs(commits, self._tags, self._heads, self._remotes)
+        tags, heads, remotes = self._git.refs()
+        commits = self._git.commitsSetRefs(commits, tags, heads, remotes)
 
         html = ''
 
@@ -228,6 +232,112 @@ class Project(ProjectBase):
 
         self.write(self.tpl(html))
 
+
+    def refs(self):
+
+        tags, heads, remotes = self._git.refs()
+
+        html = ''
+
+        # heads
+        if len(heads) > 0:
+            html += '''
+        <table class="refs">
+        <tr class="header">
+            <td>Head</td>
+            <td>Commit message</td>
+            <td>Author</td>
+            <td>Age</td>
+            <td></td>
+        </tr>
+        '''
+            for h in heads:
+                comm = h.commit()
+
+                line = comm.commentFirstLine().replace('{', '{{').replace('}', '}}')
+                v = { 'a'  : 'log',
+                      'id' : comm.id }
+                commanchor = self.anchor(line, v = v, cls = 'comment')
+
+                v = { 'a' : 'log',
+                      'id' : h.id }
+                nameanchor = self.anchor(h.name, v = v, cls = 'head')
+
+                html += '<tr>'
+                html += '<td>' + nameanchor + '</td>'
+                html += '<td>' + commanchor + '</td>'
+                html += '<td><i>' + comm.author.person + '</i></td>'
+                html += '<td>' + comm.author.date.format('%Y-%m-%d') + '</td>'
+                html += '<td>' + '</td>'
+                html += '</tr>'
+
+            html += '</table>'
+            html += '<br />'
+
+        # tags
+        if len(tags) > 0:
+            html += '''
+        <table class="refs">
+        <tr class="header">
+            <td>Tag</td>
+            <td>Message</td>
+            <td>Tagger</td>
+            <td>Age</td>
+            <td></td>
+        </tr>
+        '''
+            for t in tags:
+                v = { 'a' : 'log',
+                      'id' : t.id }
+                nameanchor = self.anchor(t.name, v = v, cls = 'ref_tag')
+
+                html += '<tr>'
+                html += '<td>' + nameanchor + '</td>'
+                html += '<td>' + t.msg + '</td>'
+                html += '<td><i>' + t.tagger.person + '</i></td>'
+                html += '<td>' + t.tagger.date.format('%Y-%m-%d') + '</td>'
+                html += '<td>' + '</td>'
+                html += '</tr>'
+
+            html += '</table>'
+            html += '<br />'
+
+        # remotes
+        if len(remotes) > 0:
+            html += '''
+        <table class="refs">
+        <tr class="header">
+            <td>Remote head</td>
+            <td>Commit message</td>
+            <td>Author</td>
+            <td>Age</td>
+            <td></td>
+        </tr>
+        '''
+            for r in remotes:
+                comm = r.commit()
+
+                line = comm.commentFirstLine().replace('{', '{{').replace('}', '}}')
+                v = { 'a'  : 'log',
+                      'id' : comm.id }
+                commanchor = self.anchor(line, v = v, cls = 'comment')
+
+                v = { 'a' : 'log',
+                      'id' : r.id }
+                nameanchor = self.anchor(r.name, v = v, cls = 'ref_remote')
+
+                html += '<tr>'
+                html += '<td>' + nameanchor + '</td>'
+                html += '<td>' + commanchor + '</td>'
+                html += '<td><i>' + comm.author.person + '</i></td>'
+                html += '<td>' + comm.author.date.format('%Y-%m-%d') + '</td>'
+                html += '<td>' + '</td>'
+                html += '</tr>'
+
+            html += '</table>'
+            html += '<br />'
+
+        self.write(self.tpl(html))
 
 
     def tpl(self, content):

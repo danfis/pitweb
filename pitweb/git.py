@@ -136,7 +136,12 @@ class GitComm(object):
             comm.append('--sort={0}'.format(sort))
 
         if pattern:
-            comm.append(pattern)
+            if type(pattern) == list:
+                for p in pattern:
+                    comm.append(p)
+            else:
+                comm.append(pattern)
+
         return self._git(comm)
 
 
@@ -264,12 +269,13 @@ class GitCommit(GitObj):
         return lines[1]
 
 class GitTag(GitObj):
-    def __init__(self, git, id, objid = None, name = '', msg = ''):
+    def __init__(self, git, id, objid = None, name = '', msg = '', tagger = None):
         super(GitTag, self).__init__(git, id)
 
         self.objid = objid
         self.name  = name
         self.msg   = msg
+        self.tagger = tagger
 
 class GitHead(GitObj):
     def __init__(self, git, id, name = ''):
@@ -277,6 +283,9 @@ class GitHead(GitObj):
 
         self.name  = name
 
+    def commit(self):
+        c = self.git.revList(self.id, max_count = 1)
+        return c[0]
 
 class Git(object):
     def __init__(self, dir, gitbin = '/usr/bin/git'):
@@ -303,25 +312,33 @@ class Git(object):
 
     def refs(self):
         format  = '%(objectname) %(objecttype) %(refname)'
-        sort    = '-*authordate'
-
-        # get raw data
-        res = self._git.forEachRef(format = format, sort = sort)
 
         tags    = []
         heads   = []
         remotes = []
 
+        # tags
+        res = self._git.forEachRef(format = format, sort = '-*authordate', pattern = 'refs/tags')
         lines = res.split('\n')
         for line in lines:
             d = line.split(' ')
             if len(d) != 3:
                 continue
 
-            if d[1] == 'tag':
-                s = self._git.catFile(d[0], type = 'tag')
-                tags.append(self._parseTag(d[0], s))
-            elif d[2][:11] == 'refs/heads/':
+            s = self._git.catFile(d[0], type = 'tag')
+            tags.append(self._parseTag(d[0], s))
+
+        # heads, remotes
+        res = self._git.forEachRef(format = format,
+                                   sort = '-committerdate', 
+                                   pattern = ['refs/heads', 'refs/remotes'])
+        lines = res.split('\n')
+        for line in lines:
+            d = line.split(' ')
+            if len(d) != 3:
+                continue
+
+            if d[2][:11] == 'refs/heads/':
                 id = d[0]
                 name = d[2][11:]
                 o = GitHead(self, id, name = name)
@@ -333,6 +350,7 @@ class Git(object):
                 remotes.append(o)
 
         return (tags, heads, remotes, )
+
 
     def commitsSetRefs(self, commits, tags, heads, remotes):
         for c in commits:
@@ -407,10 +425,12 @@ class Git(object):
                 objid = line[7:]
             elif line[:4] == 'tag ':
                 name = line[4:]
+            elif line[:6] == 'tagger':
+                tagger = self._parsePerson(line)
             elif len(line) == 0:
                 readmsg = True
                 
-        tag = GitTag(self, id = id, objid = objid, name = name, msg = msg)
+        tag = GitTag(self, id = id, objid = objid, name = name, msg = msg, tagger = tagger)
         return tag
 
 if __name__ == '__main__':
