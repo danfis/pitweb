@@ -1,6 +1,7 @@
 import re
 import datetime
 from subprocess import Popen, PIPE, STDOUT
+import stat
 
 basic_patterns = {
     'id' : r'[0-9a-fA-F]{40}',
@@ -9,8 +10,9 @@ basic_patterns = {
 }
 
 patterns = {
-    'person' : re.compile(r'[^ ]* (.*) ({epoch}) ({tz})$'.format(**basic_patterns)),
-    'person2' : re.compile(r'(.*) <(.*)>'),
+    'person'    : re.compile(r'[^ ]* (.*) ({epoch}) ({tz})$'.format(**basic_patterns)),
+    'person2'   : re.compile(r'(.*) <(.*)>'),
+	'diff-tree' : re.compile(r'^:([0-7]{6}) ([0-7]{6}) ([0-9a-fA-F]{40}) ([0-9a-fA-F]{40}) (.)([0-9]{0,3})\t(.*)$'),
     'rev-list' : {
         'header'   : re.compile(r'^({0})( {0})*'.format(basic_patterns['id'])),
         'tree'     : re.compile(r'^tree ({0})$'.format(basic_patterns['id'])),
@@ -166,6 +168,21 @@ class GitComm(object):
         comm.append(obj)
         return self._git(comm)
 
+    def diffTree(self, obj = 'HEAD', parent = None):
+        comm = ['diff-tree']
+
+        comm.append('-r')
+        comm.append('--no-commit-id')
+        comm.append('-M')
+        comm.append('--root')
+
+        if parent:
+            comm.append(parent)
+        else:
+            comm.append('-c')
+
+        comm.append(obj)
+        return self._git(comm)
 
     def lsTree(self, obj = 'HEAD', recursive = False, long = False,
                      full_tree = False):
@@ -295,6 +312,40 @@ class GitHead(GitObj):
         c = self.git.revList(self.id, max_count = 1)
         return c[0]
 
+class GitDiffTree(GitObj):
+    def __init__(self, git, from_mode, to_mode, from_id, to_id, status,
+                            similarity, from_file, to_file):
+        self.from_mode = from_mode
+        self.to_mode   = to_mode
+        self.from_id   = from_id
+        self.to_id     = to_id
+        self.status    = status
+        self.similarity = similarity
+        self.from_file = from_file
+        self.to_file   = to_file
+
+        self.from_mode_oct = int(self.from_mode, 8)
+        self.to_mode_oct   = int(self.to_mode, 8)
+        self.from_file_type = self.fileType(self.from_mode_oct)
+        self.to_file_type   = self.fileType(self.to_mode_oct)
+
+        if len(self.similarity) > 0:
+            self.similarity = '{0}%'.format(int(self.similarity))
+
+    def fileType(self, mode):
+        if mode == 0:
+            return ''
+
+        # TODO S_ISGITLINK
+        if stat.S_ISDIR(mode):
+            return 'directory'
+        elif stat.S_ISREG(mode):
+            return 'file'
+        elif stat.S_ISLNK(mode):
+            return 'symlink'
+        else:
+            return 'unknown'
+
 class Git(object):
     def __init__(self, dir, gitbin = '/usr/bin/git'):
         global patterns
@@ -317,6 +368,12 @@ class Git(object):
                 commits.append(self._parseCommit(commit_str))
 
         return commits
+
+    def commit(self, id = 'HEAD'):
+        c = self.revList(id, max_count = 1)
+        if len(c) == 0:
+            return None
+        return c[0]
 
     def refs(self):
         format  = '%(objectname) %(objecttype) %(refname)'
@@ -375,6 +432,48 @@ class Git(object):
                     c.remotes.append(r)
 
         return commits
+
+
+    def diffTree(self, commit):
+        cid = commit.id
+        pid = None
+        if len(commit.parents) == 1:
+            pid = commit.parents[0]
+        s = self._git.diffTree(cid, parent = pid)
+
+        diff_trees = []
+
+        lines = s.split('\n')
+        for line in lines:
+            print line
+            o = self._parseDiffTree(line)
+            if o:
+                diff_trees.append(o)
+
+        return diff_trees
+
+    def _parseDiffTree(self, line):
+        global patterns
+
+        diff_tree = None
+        match = patterns['diff-tree'].match(line)
+        if match:
+            status = match.group(5)
+            if status in ['R', 'C']:
+                from_file, to_file = match.group(7).split('\t', 1)
+            else:
+                from_file = to_file = match.group(7)
+
+            diff_tree = GitDiffTree(self, from_mode  = match.group(1),
+                                          to_mode    = match.group(2),
+                                          from_id    = match.group(3),
+                                          to_id      = match.group(4),
+                                          status     = status,
+                                          similarity = match.group(6),
+                                          from_file  = from_file,
+                                          to_file    = to_file)
+
+        return diff_tree
 
 
     def _parsePerson(self, line):

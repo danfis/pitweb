@@ -64,6 +64,13 @@ class ProjectBase(object):
         s = string.join(map(lambda x: str(x), args), ' ')
         self._req.write(s)
 
+    def esc(self, s):
+        """ Replaces special characters in s by HTML escape sequences """
+        s = s.replace('<', '&lt;')
+        s = s.replace('>', '&gt;')
+        s = s.replace('\n', '<br />')
+        return s
+
     def run(self):
         if self._a == 'log':
             self._section = 'log'
@@ -74,6 +81,9 @@ class ProjectBase(object):
         elif self._a == 'summary':
             self._section = 'summary'
             self.summary()
+        elif self._a == 'commit':
+            self._section = 'commit'
+            self.commit(id = self._id)
 
         return apache.OK
 
@@ -139,6 +149,9 @@ class Project(ProjectBase):
             showmsg = '0'
         return self.anchor(html, cls = cls, v = { 'a' : 'log', 'id' : id, 'showmsg' : showmsg, 'page' : page })
 
+    def anchorCommit(self, html, id, cls = ''):
+        return self.anchor(html, v = { 'a' : 'commit', 'id' : id }, cls = cls)
+
 
     def log(self, id = 'HEAD', showmsg = False, page = 1):
         max_count = self._commits_per_page * page;
@@ -193,11 +206,11 @@ class Project(ProjectBase):
             <td><i>{author}</i></td>
             <td>'''
 
-            line = commit.commentFirstLine()
+            line = self.esc(commit.commentFirstLine())
             line = line.replace('{', '{{')
             line = line.replace('}', '}}')
 
-            h += self.anchorLog(line, commit.id, showmsg, 1, cls = 'comment')
+            h += self.anchorCommit(line, commit.id, cls = 'comment')
 
             for b in commit.heads:
                 h += self.anchorLog(b.name, b.id, showmsg, 1, cls = "branch")
@@ -209,7 +222,7 @@ class Project(ProjectBase):
                 h += self.anchorLog('remotes/' + r.name, r.id, showmsg, 1, cls = "remote")
 
             h += '''
-                {longcomment}
+            {longcomment}
             </td>
             <td><a href="?a=commit;id={id}">commit</a></td>
             <td><a href="?a=diff;id={id}">diff</a></td>
@@ -220,7 +233,9 @@ class Project(ProjectBase):
 
             longcomment = ''
             if showmsg:
-                longcomment = '<br />' + commit.commentRestLines().replace('\n', '<br />') + '<br />'
+                longcomment  = '<div class="commit-msg"><br />'
+                longcomment += self.esc(commit.commentRestLines().strip(' \n\t'))
+                longcomment += '</div><br />'
 
             html += h.format(id          = commit.id,
                              author      = commit.author.name(),
@@ -276,6 +291,20 @@ class Project(ProjectBase):
         self.write(self.tpl(html))
 
 
+    def commit(self, id):
+        commit = self._git.commit(id)
+
+        html = ''
+        if commit:
+            html += self.commitInfo(commit)
+            html += '<br />'
+            html += self.diffTreeTable(commit)
+
+        self.write(self.tpl(html))
+
+
+
+
     def headsTable(self, heads):
         html = '''
         <table class="refs">
@@ -290,14 +319,15 @@ class Project(ProjectBase):
         for h in heads:
             comm = h.commit()
 
-            line = comm.commentFirstLine().replace('{', '{{').replace('}', '}}')
+            line = self.esc(comm.commentFirstLine())
+            line = line.replace('{', '{{').replace('}', '}}')
             v = { 'a'  : 'log',
                   'id' : comm.id }
             commanchor = self.anchor(line, v = v, cls = 'comment')
 
             v = { 'a' : 'log',
                   'id' : h.id }
-            nameanchor = self.anchor(h.name, v = v, cls = 'head')
+            nameanchor = self.anchor(self.esc(h.name), v = v, cls = 'head')
 
             html += '<tr>'
             html += '<td>' + nameanchor + '</td>'
@@ -328,12 +358,12 @@ class Project(ProjectBase):
         for t in tags[:max]:
             v = { 'a' : 'log',
                   'id' : t.id }
-            nameanchor = self.anchor(t.name, v = v, cls = 'ref_tag')
+            nameanchor = self.anchor(self.esc(t.name), v = v, cls = 'ref_tag')
 
             html += '<tr>'
             html += '<td>' + nameanchor + '</td>'
-            html += '<td>' + t.msg + '</td>'
-            html += '<td><i>' + t.tagger.name() + '</i></td>'
+            html += '<td>' + self.esc(t.msg) + '</td>'
+            html += '<td><i>' + self.esc(t.tagger.name()) + '</i></td>'
             html += '<td>' + t.tagger.date.format('%Y-%m-%d') + '</td>'
             html += '<td>' + '</td>'
             html += '</tr>'
@@ -360,19 +390,21 @@ class Project(ProjectBase):
         for r in remotes:
             comm = r.commit()
 
-            line = comm.commentFirstLine().replace('{', '{{').replace('}', '}}')
+            line = self.esc(comm.commentFirstLine())
+            line = line.replace('{', '{{').replace('}', '}}')
+
             v = { 'a'  : 'log',
                   'id' : comm.id }
             commanchor = self.anchor(line, v = v, cls = 'comment')
 
             v = { 'a' : 'log',
                   'id' : r.id }
-            nameanchor = self.anchor(r.name, v = v, cls = 'ref_remote')
+            nameanchor = self.anchor(self.esc(r.name), v = v, cls = 'ref_remote')
 
             html += '<tr>'
             html += '<td>' + nameanchor + '</td>'
             html += '<td>' + commanchor + '</td>'
-            html += '<td><i>' + comm.author.name() + '</i></td>'
+            html += '<td><i>' + self.esc(comm.author.name()) + '</i></td>'
             html += '<td>' + comm.author.date.format('%Y-%m-%d') + '</td>'
             html += '<td>' + '</td>'
             html += '</tr>'
@@ -404,20 +436,20 @@ class Project(ProjectBase):
             <td><i>{author}</i></td>
             <td>'''
 
-            line = commit.commentFirstLine()
+            line = self.esc(commit.commentFirstLine())
             line = line.replace('{', '{{')
             line = line.replace('}', '}}')
 
-            h += self.anchorLog(line, commit.id, False, 1, cls = 'comment')
+            h += self.anchorCommit(line, commit.id, cls = 'comment')
 
             for b in commit.heads:
-                h += self.anchorLog(b.name, b.id, False, 1, cls = "branch")
+                h += self.anchorLog(self.esc(b.name), b.id, False, 1, cls = "branch")
 
             for t in commit.tags:
-                h += self.anchorLog(t.name, t.id, False, 1, cls = "tag")
+                h += self.anchorLog(self.esc(t.name), t.id, False, 1, cls = "tag")
 
             for r in commit.remotes:
-                h += self.anchorLog('remotes/' + r.name, r.id, False, 1, cls = "remote")
+                h += self.anchorLog('remotes/' + self.esc(r.name), r.id, False, 1, cls = "remote")
 
             h += '''
             </td>
@@ -429,13 +461,140 @@ class Project(ProjectBase):
         '''
 
             html += h.format(id          = commit.id,
-                             author      = commit.author.name(),
+                             author      = self.esc(commit.author.name()),
                              date        = commit.author.date.format('%Y-%m-%d'),
                              tree        = commit.tree)
         html += '</table>'
 
         return html
 
+
+    def commitInfoPerson(self, title, person):
+        p = self.esc(person.person)
+        date = person.date.format('%Y-%m-%d %H:%M:%S')
+        date += ' (' + person.date.local_tz + ')'
+        html = '''
+        <tr>
+            <td>{title}</td>
+            <td><i>{p}</i></td>
+            <td>{date}</td>
+        </tr>
+        '''.format(title = title, p = p, date = date)
+        return html
+
+    def commitInfo(self, commit):
+        html = ''
+        html += '<table class="commit-info">'
+
+        # author, committer
+        html += self.commitInfoPerson('author', commit.author)
+        html += self.commitInfoPerson('committer', commit.committer)
+
+        # commit
+        comm = self.anchorCommit(commit.id, commit.id)
+        comm += '&nbsp;&nbsp;('
+        comm += self.anchor('patch', v = { 'a' : 'patch', 'id' : commit.id }, cls = "")
+        comm += ')'
+        html += '''
+        <tr>
+            <td>commit</td>
+            <td colspan="2">{0}</td>
+        </tr>'''.format(comm)
+
+        # tree
+        tree = self.anchor(commit.tree, v = { 'a' : 'tree', 'id' : commit.tree }, cls = "")
+        html += '''
+        <tr>
+            <td>tree</td>
+            <td colspan="2">{0}</td>
+        </tr>'''.format(tree)
+
+        # parents
+        for parent in commit.parents:
+            par = self.anchorCommit(parent, parent)
+            par += '&nbsp;&nbsp;('
+            par += self.anchor('diff', v = { 'a' : 'diff', 'id' : parent }, cls = "")
+            par += ')'
+            html += '''
+            <tr>
+                <td>parent</td>
+                <td colspan="2">{0}</td>
+            </tr>
+            '''.format(par)
+
+        html += '</table>'
+
+        # comment
+        short = self.esc(commit.commentFirstLine())
+        rest  = self.esc(commit.commentRestLines().strip(' \n\t'))
+        html += '''<h3 class="commit-info">{short}</h3>
+                   <div class="commit-msg">{rest}</div>'''.format(short = short, rest = rest)
+        return html
+
+    def diffTreeTable(self, commit):
+        diff_trees = self._git.diffTree(commit)
+
+        html = ''
+        html += '<table class="diff-tree">'
+        html += '''
+        <tr>
+            <td colspan="3" class="diff-tree-num-changes">{0} files changed</td>
+        </tr>'''.format(len(diff_trees))
+
+        for d in diff_trees:
+            html += '<tr>'
+
+            anchor = self.anchor(self.esc(d.to_file), v = { 'a' : 'blob', 'id' : d.to_id }, cls = "diff-tree-file")
+            html += '<td>{0}</td>'.format(anchor)
+
+            if d.status == 'A': # added
+                html += '<td class="diff-tree-A">[new file with mode: {0:04o}]</td>'.format(d.to_mode_oct & 0777)
+
+                menu = self.anchor('blob', v = { 'a' : 'blob', 'id' : d.to_id }, cls = "")
+
+            elif d.status in ['M', 'T']: # modified, or type changed
+                mode_change = ''
+                if d.from_mode != d.to_mode:
+                    mode_change = '[changed'
+                    if d.from_file_type != d.to_file_type:
+                        mode_change += ' from {0} to {1}'.format(d.from_file_type, d.to_file_type)
+
+                    if (d.from_mode_oct & 0777) != (d.to_mode_oct & 0777):
+                        if d.from_mode_oct and d.to_mode_oct:
+                            mode_change += ' mode: {0}->{1}'.format(d.from_mode, d.to_mode)
+                        elif d.to_mode_oct:
+                            mode_change += ' mode: {0}'.format(d.to_mode)
+                    mode_change += ']'
+
+                html += '<td class="diff-tree-T">{0}</td>'.format(mode_change)
+
+                menu = self.anchor('diff', v = { 'a' : 'diff', 'id' : d.to_id }, cls = "")
+                menu += '&nbsp;|&nbsp;'
+                menu += self.anchor('blob', v = { 'a' : 'blob', 'id' : d.to_id }, cls = "")
+
+            elif d.status == 'D': # deleted
+                html += '<td class="diff-tree-D">[deleted {0}]</td>'.format(d.from_file_type)
+
+                menu = self.anchor('blob', v = { 'a' : 'blob', 'id' : d.to_id }, cls = "")
+
+            elif d.status in ['R', 'C']: # renamed or copied
+                change = '[moved'
+                if d.status == 'C':
+                    change = 'copied'
+                change += ' from <span class="diff-tree-RC-file">{0}</span> with {1} similarity]'
+                change = change.format(self.esc(d.from_file), d.similarity)
+                html += '<td class="diff-tree-RC">{0}</td>'.format(change)
+
+                menu = self.anchor('diff', v = { 'a' : 'diff', 'id' : d.to_id }, cls = "")
+                menu += '&nbsp;|&nbsp;'
+                menu += self.anchor('blob', v = { 'a' : 'blob', 'id' : d.to_id }, cls = "")
+
+            html += '<td class="diff-tree-menu">{0}</td>'.format(menu)
+            html += '</tr>'
+
+        html += '</table>'
+
+        return html
 
     def tpl(self, content):
         header = '<span class="project">{project_name}</span>'.format(project_name = self._project_name)
@@ -457,7 +616,7 @@ class Project(ProjectBase):
         <title>Pitweb - {project_name}</title>
     </head>
 
-    <bod>
+    <body>
         <div class="header">{header}</div>
         <div class="menu">{menu}</div>
 

@@ -1,8 +1,12 @@
-html * { font-family: sans; font-size: 14px; }
+html * { font-family: sans; font-size: 13px; }
 body { padding: 5px; }
+
+table tr td { vertical-align: top; padding-left: 4px; padding-right: 4px; }
+table tr.header { font-weight: bold; font-size: 15px; }
 
 a { color: #0000cc; text-decoration: none; } 
 a:hover { text-decoration: underline; }
+a.comment { font-weight: bold; color: #666666; }
 a.tag { display: block-inline; background-color: #ffffaa; border: 1px solid #f1ee00; color: black;
         margin-left: 2px; margin-right: 2px;
         padding-left: 4px; padding-right: 4px; padding-top: 1px; padding-bottom: 1px; }
@@ -25,8 +29,10 @@ div.menu a.sel { background-color: #c8c8c8; }
 
 table tr.title td { padding: 3px; padding-left: 7px; font-size: 16px; font-weight: bold; background-color: #edece6; }
 
-
 div.content { margin: 15px; }
+
+
+div.commit-msg { font-family: monospace; white-space: pre; }
 
 
 div.log_nav { margin: 10px; }
@@ -34,14 +40,19 @@ div.log_nav span.sep { margin-left: 5px; margin-right: 5px; }
 div.log_nav span { color: #555555; }
 table.log tr.log_header { font-weight: bold; font-size: 15px; }
 table.log tr:hover { background-color: #fbfaf7; }
-table.log tr td { vertical-align: top; padding-left: 4px; padding-right: 4px; }
-table.log tr td a.comment { font-weight: bold; color: #666666; }
-
-table tr.header { font-weight: bold; font-size: 15px; }
-a.comment { font-weight: bold; color: #666666; }
 
 table.refs tr:hover { background-color: #fbfaf7; }
-table.refs tr td { vertical-align: top; padding-left: 4px; padding-right: 4px; }
 table.refs a.head { font-weight: bold; color: #469446; }
 table.refs a.ref_tag { font-weight: bold; color: #918f00; }
 table.refs a.ref_remote { font-weight: bold; color: #4747ba; }
+
+table.diff-tree tr td { font-family: monospace; font-size: 12px; }
+table.diff-tree tr td * { font-family: monospace; font-size: 12px; }
+td.diff-tree-num-changes { font-family: sans !important; font-style: italic; font-size: 13px !important; }
+td.diff-tree-A { color: green; }
+td.diff-tree-D { color: #C00000; }
+td.diff-tree-RC { color: #777; }
+span.diff-tree-RC-file { color: black; }
+td.diff-tree-menu { font-family: sans !important; }
+td.diff-tree-menu * { font-family: sans !important; }
+a.diff-tree-file { color: black; }
