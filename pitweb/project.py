@@ -182,68 +182,7 @@ class Project(ProjectBase):
         nav += '</div>'
 
         html += nav
-
-
-        # Log list
-        html += '''
-<table class="log">
-        <tr class="log_header">
-            <td>Age</td>
-            <td>Author</td>
-            <td>Commit message ({0})</td>
-            <td></td>
-            <td></td>
-            <td></td>
-            <td></td>
-        </tr>
-        '''.format(expand)
-
-        for commit in commits:
-
-            h = '''
-        <tr>
-            <td>{date}</td>
-            <td><i>{author}</i></td>
-            <td>'''
-
-            line = self.esc(commit.commentFirstLine())
-            line = line.replace('{', '{{')
-            line = line.replace('}', '}}')
-
-            h += self.anchorCommit(line, commit.id, cls = 'comment')
-
-            for b in commit.heads:
-                h += self.anchorLog(b.name, b.id, showmsg, 1, cls = "branch")
-
-            for t in commit.tags:
-                h += self.anchorLog(t.name, t.id, showmsg, 1, cls = "tag")
-
-            for r in commit.remotes:
-                h += self.anchorLog('remotes/' + r.name, r.id, showmsg, 1, cls = "remote")
-
-            h += '''
-            {longcomment}
-            </td>
-            <td><a href="?a=commit;id={id}">commit</a></td>
-            <td><a href="?a=diff;id={id}">diff</a></td>
-            <td><a href="?a=tree;id={tree};parent={id}">tree</a></td>
-            <td><a href="?a=snapshot;id={id}">snapshot</a></td>
-        </tr>
-        '''
-
-            longcomment = ''
-            if showmsg:
-                longcomment  = '<div class="commit-msg"><br />'
-                longcomment += self.esc(commit.commentRestLines().strip(' \n\t'))
-                longcomment += '</div><br />'
-
-            html += h.format(id          = commit.id,
-                             author      = commit.author.name(),
-                             date        = commit.author.date.format('%Y-%m-%d'),
-                             longcomment = longcomment,
-                             tree        = commit.tree)
-        html += '</table>'
-
+        html += self.logTable(commits, longcomment = True, id = id, showmsg = showmsg, page = page)
         html += nav
 
         self.write(self.tpl(html))
@@ -286,7 +225,7 @@ class Project(ProjectBase):
             html += self.tagsTable(tags, 10)
             html += '<br />'
 
-        html += self.shortlogTable(commits)
+        html += self.logTable(commits)
 
         self.write(self.tpl(html))
 
@@ -412,21 +351,29 @@ class Project(ProjectBase):
         html += '</table>'
         return html
 
-    def shortlogTable(self, commits):
+    def logTable(self, commits, id = 'HEAD', longcomment = False, showmsg = False, page = 1):
         html = ''
+
+        expand = ''
+        if longcomment:
+            if not showmsg:
+                expand = self.anchorLog('Expand', id, not showmsg, page)
+            else:
+                expand = self.anchorLog('Collapse', id, not showmsg, page)
+            expand = ' (' + expand + ')'
 
         html += '''
 <table class="log">
         <tr class="log_header">
             <td>Age</td>
             <td>Author</td>
-            <td>Commit message</td>
+            <td>Commit message{0}</td>
             <td></td>
             <td></td>
             <td></td>
             <td></td>
         </tr>
-        '''
+        '''.format(expand)
 
         for commit in commits:
 
@@ -443,15 +390,16 @@ class Project(ProjectBase):
             h += self.anchorCommit(line, commit.id, cls = 'comment')
 
             for b in commit.heads:
-                h += self.anchorLog(self.esc(b.name), b.id, False, 1, cls = "branch")
+                h += self.anchorLog(self.esc(b.name), b.id, showmsg, 1, cls = "branch")
 
             for t in commit.tags:
-                h += self.anchorLog(self.esc(t.name), t.id, False, 1, cls = "tag")
+                h += self.anchorLog(self.esc(t.name), t.id, showmsg, 1, cls = "tag")
 
             for r in commit.remotes:
-                h += self.anchorLog('remotes/' + self.esc(r.name), r.id, False, 1, cls = "remote")
+                h += self.anchorLog('remotes/' + self.esc(r.name), r.id, showmsg, 1, cls = "remote")
 
             h += '''
+            {longcomment}
             </td>
             <td><a href="?a=commit;id={id}">commit</a></td>
             <td><a href="?a=diff;id={id}">diff</a></td>
@@ -460,9 +408,16 @@ class Project(ProjectBase):
         </tr>
         '''
 
+            longcomment = ''
+            if showmsg:
+                longcomment  = '<div class="commit-msg"><br />'
+                longcomment += self.esc(commit.commentRestLines().strip(' \n\t'))
+                longcomment += '</div><br />'
+
             html += h.format(id          = commit.id,
                              author      = self.esc(commit.author.name()),
                              date        = commit.author.date.format('%Y-%m-%d'),
+                             longcomment = longcomment,
                              tree        = commit.tree)
         html += '</table>'
 
