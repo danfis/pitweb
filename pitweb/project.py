@@ -629,10 +629,14 @@ class Project(ProjectBase):
         sections = ['summary', 'log', 'refs', 'commit', 'diff', 'tree']
         menu = ''
         for sec in sections:
-            menu += '<a href="?a={0}"'.format(sec)
+            cls = ''
             if sec == self._section:
-                menu += ' class="sel"'
-            menu += '>{0}</a>'.format(sec)
+                cls = 'sel'
+
+            v = { 'a' : sec }
+            if sec not in ['summary', 'refs', 'log']:
+                v['id'] = self._id
+            menu += self.anchor(sec, v = v, cls = cls)
         menu = '<table><tr><td>' + menu + '</td></tr></table>'
 
         html = '''
