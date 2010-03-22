@@ -582,7 +582,8 @@ class Project(ProjectBase):
 
         html += '<div class="patch-index">'
         while cur < length and not pat_index.match(lines[cur]):
-            html += lines[cur] + '<br />'
+            if len(lines[cur]) > 0:
+                html += lines[cur] + '<br />'
             cur += 1
         if cur < length:
             m = pat_index.match(lines[cur])

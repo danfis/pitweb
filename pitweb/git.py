@@ -176,6 +176,7 @@ class GitComm(object):
         comm.append('--no-commit-id')
         comm.append('-M')
         comm.append('--root')
+        comm.append('-a')
 
         if patch:
             comm.append('--patch-with-raw')
