@@ -198,6 +198,22 @@ class GitComm(object):
         comm.append(obj)
         return self._git(comm)
 
+    def formatPatch(self, id, id2):
+        comm = ['format-patch']
+
+        comm.append('-n')
+        comm.append('--root')
+        comm.append('--stdout')
+        comm.append('--encoding=utf8')
+
+        if id2 is None:
+            comm.append('-1')
+            comm.append(id)
+        else:
+            comm.append(id + '..' + id2)
+
+        return self._git(comm)
+
 
 class GitDate(object):
     def __init__(self, epoch, tz):
@@ -451,6 +467,9 @@ class Git(object):
                 diff_trees.append(o)
 
         return diff_trees
+
+    def formatPatch(self, id, id2):
+        return self._git.formatPatch(id, id2)
 
     def _parseDiffTree(self, line):
         global patterns

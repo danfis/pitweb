@@ -27,6 +27,7 @@ class ProjectBase(object):
         args = self._parseArgs()
         self._a       = args.get('a', 'log')
         self._id      = args.get('id', 'HEAD')
+        self._id2     = args.get('id2', None)
         self._showmsg = args.get('showmsg', '0')
         if self._showmsg == '0':
             self._showmsg = False
@@ -84,43 +85,17 @@ class ProjectBase(object):
         elif self._a == 'commit':
             self._section = 'commit'
             self.commit(id = self._id)
+        elif self._a == 'patch':
+            self.patch(id = self._id, id2 = self._id2)
 
         return apache.OK
 
     def write(self, s):
         self._req.write(s)
 
+    def setContentType(self, type):
+        self._req.content_type = type
 
-    def summary(self):
-        """ Returns Summary page """
-        return ''
-
-    def log(self, id = 'HEAD', showmsg = False, page = 1):
-        """ Returns Log page """ 
-        return ''
-
-    def commit(self, id = 'HEAD'):
-        """ Returns Commit page """
-        return ''
-
-    def commitdiff(self, id = 'HEAD', id2 = None, raw = False):
-        return ''
-
-    def tree(self, id = 'HEAD', parent = 'HEAD'):
-        return ''
-
-    def refs(self):
-        return ''
-
-
-    def snapshot(self, id = 'HEAD'):
-        return ''
-
-    def tag(self, id):
-        return ''
-
-    def patch(self, id = 'HEAD'):
-        return ''
 
 
 class Project(ProjectBase):
@@ -241,6 +216,10 @@ class Project(ProjectBase):
 
         self.write(self.tpl(html))
 
+    def patch(self, id, id2):
+        patch = self._git.formatPatch(id, id2)
+        self.setContentType('text/plain')
+        self.write(patch)
 
 
 
@@ -469,6 +448,9 @@ class Project(ProjectBase):
             par = self.anchorCommit(parent, parent)
             par += '&nbsp;&nbsp;('
             par += self.anchor('diff', v = { 'a' : 'diff', 'id' : parent }, cls = "")
+            par += ')'
+            par += '&nbsp;&nbsp;('
+            par += self.anchor('patch', v = { 'a' : 'patch', 'id' : parent, 'id2' : commit.id }, cls = "")
             par += ')'
             html += '''
             <tr>
