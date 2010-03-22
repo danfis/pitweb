@@ -1,6 +1,7 @@
 from mod_python import apache, util
 import string
 import git
+import re
 
 ###
 # Sections:
@@ -85,6 +86,9 @@ class ProjectBase(object):
         elif self._a == 'commit':
             self._section = 'commit'
             self.commit(id = self._id)
+        elif self._a == 'diff':
+            self._section = 'diff'
+            self.diff(id = self._id, id2 = self._id2)
         elif self._a == 'patch':
             self.patch(id = self._id, id2 = self._id2)
 
@@ -207,12 +211,16 @@ class Project(ProjectBase):
 
     def commit(self, id):
         commit = self._git.commit(id)
+        parent = None
+        if len(commit.parents) == 1:
+            parent = commit.parents[0]
+        diff_trees = self._git.diffTree(id, parent, patch = True)
 
         html = ''
         if commit:
             html += self.commitInfo(commit)
             html += '<br />'
-            html += self.diffTreeTable(commit)
+            html += self.diffTreeTable(diff_trees)
 
         self.write(self.tpl(html))
 
@@ -221,6 +229,13 @@ class Project(ProjectBase):
         self.setContentType('text/plain')
         self.write(patch)
 
+    def diff(self, id, id2):
+        diff_trees = self._git.diffTree(id, id2, patch = True)
+
+        html = ''
+        html += self.diffTreeTable(diff_trees)
+
+        self.write(self.tpl(html))
 
 
     def headsTable(self, heads):
@@ -447,7 +462,7 @@ class Project(ProjectBase):
         for parent in commit.parents:
             par = self.anchorCommit(parent, parent)
             par += '&nbsp;&nbsp;('
-            par += self.anchor('diff', v = { 'a' : 'diff', 'id' : parent }, cls = "")
+            par += self.anchor('diff', v = { 'a' : 'diff', 'id' : parent, 'id2' : commit.id }, cls = "")
             par += ')'
             par += '&nbsp;&nbsp;('
             par += self.anchor('patch', v = { 'a' : 'patch', 'id' : parent, 'id2' : commit.id }, cls = "")
@@ -468,14 +483,15 @@ class Project(ProjectBase):
                    <div class="commit-msg">{rest}</div>'''.format(short = short, rest = rest)
         return html
 
-    def diffTreeTable(self, commit):
-        diff_trees = self._git.diffTree(commit)
-
+    def diffTreeTable(self, diff_trees):
         html = ''
         html += '<table class="diff-tree">'
         html += '''
         <tr>
             <td colspan="3" class="diff-tree-num-changes">{0} files changed</td>
+        </tr>
+        <tr>
+            <td colspan="3"><hr /></td>
         </tr>'''.format(len(diff_trees))
 
         for d in diff_trees:
@@ -486,8 +502,6 @@ class Project(ProjectBase):
 
             if d.status == 'A': # added
                 html += '<td class="diff-tree-A">[new file with mode: {0:04o}]</td>'.format(d.to_mode_oct & 0777)
-
-                menu = self.anchor('blob', v = { 'a' : 'blob', 'id' : d.to_id }, cls = "")
 
             elif d.status in ['M', 'T']: # modified, or type changed
                 mode_change = ''
@@ -505,14 +519,8 @@ class Project(ProjectBase):
 
                 html += '<td class="diff-tree-T">{0}</td>'.format(mode_change)
 
-                menu = self.anchor('diff', v = { 'a' : 'diff', 'id' : d.to_id }, cls = "")
-                menu += '&nbsp;|&nbsp;'
-                menu += self.anchor('blob', v = { 'a' : 'blob', 'id' : d.to_id }, cls = "")
-
             elif d.status == 'D': # deleted
                 html += '<td class="diff-tree-D">[deleted {0}]</td>'.format(d.from_file_type)
-
-                menu = self.anchor('blob', v = { 'a' : 'blob', 'id' : d.to_id }, cls = "")
 
             elif d.status in ['R', 'C']: # renamed or copied
                 change = '[moved'
@@ -522,14 +530,96 @@ class Project(ProjectBase):
                 change = change.format(self.esc(d.from_file), d.similarity)
                 html += '<td class="diff-tree-RC">{0}</td>'.format(change)
 
-                menu = self.anchor('diff', v = { 'a' : 'diff', 'id' : d.to_id }, cls = "")
-                menu += '&nbsp;|&nbsp;'
-                menu += self.anchor('blob', v = { 'a' : 'blob', 'id' : d.to_id }, cls = "")
+            menu = '<a href="#{0}">diff</a>'.format(d.from_id + d.to_id)
+            menu += '&nbsp;|&nbsp;'
+            menu += self.anchor('blob', v = { 'a' : 'blob', 'id' : d.to_id }, cls = "")
 
             html += '<td class="diff-tree-menu">{0}</td>'.format(menu)
             html += '</tr>'
 
         html += '</table>'
+
+        html += '<br />'
+
+        html += self.diffTreePatch(diff_trees)
+
+        return html
+
+    def diffTreePatch(self, diff_trees):
+        html = ''
+
+        for d in diff_trees:
+            html += self._formatPatch(d, d.patch)
+        return html
+
+    def _formatPatch(self, d, patch):
+        pat_head  = re.compile(r'^diff --git (a/.*) (b/.*)$')
+        pat_index = re.compile(r'^index ([^\.]*)..([^ ]*)(.*)$')
+        pat_from_file = re.compile(r'^---')
+        pat_chunk = re.compile(r'^(@@.*@@)(.*)$')
+
+        lines = patch.split('\n')
+
+        html = ''
+        html += '<div class="patch">'
+
+        cur = 0
+        length = len(lines)
+
+        # header line
+        m = pat_head.match(lines[cur])
+        if m:
+            a = m.group(1)
+            b = m.group(2)
+            html += '<a name="{0}"></a>'.format(d.from_id + d.to_id)
+            html += '<div class="patch-header">'
+            html += 'diff --git '
+            html += self.anchor(a, v = { 'a' : 'tree', 'f' : a[2:], 'id' : d.from_id }, cls = '')
+            html += '&nbsp;'
+            html += self.anchor(b, v = { 'a' : 'tree', 'f' : b[2:], 'id' : d.to_id }, cls = '')
+            html += '</div>'
+            cur += 1
+
+        html += '<div class="patch-index">'
+        while cur < length and not pat_index.match(lines[cur]):
+            html += lines[cur] + '<br />'
+            cur += 1
+        if cur < length:
+            m = pat_index.match(lines[cur])
+            a = m.group(1)
+            b = m.group(2)
+            html += 'index '
+            html += self.anchor(a, v = { 'a' : 'tree', 'f' : a, 'id' : d.from_id }, cls = '')
+            html += '..'
+            html += self.anchor(b, v = { 'a' : 'tree', 'f' : b, 'id' : d.to_id }, cls = '')
+            html += str(m.group(3))
+        html += '</div>'
+        cur += 1
+
+        if cur < length:
+            html += '<div class="patch-from-file">' + lines[cur] + '</div>'
+            cur += 1
+        if cur < length:
+            html += '<div class="patch-to-file">' + lines[cur] + '</div>'
+            cur += 1
+
+        for line in lines[cur:]:
+            m = pat_chunk.match(line)
+            if m:
+                html += '<div class="patch-chunk">'
+                html += '<span class="patch-chunk-range">' + m.group(1) + '</span>'
+                html += str(m.group(2))
+                html += '</div>'
+                continue
+
+            if len(line) > 0 and line[0] == '-':
+                html += '<div class="patch-rm">' + line + '</div>'
+            elif len(line) > 0 and line[0] == '+':
+                html += '<div class="patch-add">' + line + '</div>'
+            else:
+                html += '<div class="patch-line">' + line + '</div>'
+
+        html += '</div>'
 
         return html
 

@@ -13,6 +13,7 @@ patterns = {
     'person'    : re.compile(r'[^ ]* (.*) ({epoch}) ({tz})$'.format(**basic_patterns)),
     'person2'   : re.compile(r'(.*) <(.*)>'),
 	'diff-tree' : re.compile(r'^:([0-7]{6}) ([0-7]{6}) ([0-9a-fA-F]{40}) ([0-9a-fA-F]{40}) (.)([0-9]{0,3})\t(.*)$'),
+	'diff-tree-patch' : re.compile(r'^diff --git'),
     'rev-list' : {
         'header'   : re.compile(r'^({0})( {0})*'.format(basic_patterns['id'])),
         'tree'     : re.compile(r'^tree ({0})$'.format(basic_patterns['id'])),
@@ -168,13 +169,16 @@ class GitComm(object):
         comm.append(obj)
         return self._git(comm)
 
-    def diffTree(self, obj = 'HEAD', parent = None):
+    def diffTree(self, obj = 'HEAD', parent = None, patch = False):
         comm = ['diff-tree']
 
         comm.append('-r')
         comm.append('--no-commit-id')
         comm.append('-M')
         comm.append('--root')
+
+        if patch:
+            comm.append('--patch-with-raw')
 
         if parent:
             comm.append(parent)
@@ -330,7 +334,7 @@ class GitHead(GitObj):
 
 class GitDiffTree(GitObj):
     def __init__(self, git, from_mode, to_mode, from_id, to_id, status,
-                            similarity, from_file, to_file):
+                            similarity, from_file, to_file, patch = ''):
         self.from_mode = from_mode
         self.to_mode   = to_mode
         self.from_id   = from_id
@@ -339,6 +343,7 @@ class GitDiffTree(GitObj):
         self.similarity = similarity
         self.from_file = from_file
         self.to_file   = to_file
+        self.patch     = patch
 
         self.from_mode_oct = int(self.from_mode, 8)
         self.to_mode_oct   = int(self.to_mode, 8)
@@ -450,21 +455,26 @@ class Git(object):
         return commits
 
 
-    def diffTree(self, commit):
-        cid = commit.id
-        pid = None
-        if len(commit.parents) == 1:
-            pid = commit.parents[0]
-        s = self._git.diffTree(cid, parent = pid)
+    def diffTree(self, id, parent, patch = False):
+        s = self._git.diffTree(id, parent = parent, patch = patch)
 
         diff_trees = []
 
         lines = s.split('\n')
-        for line in lines:
-            print line
+        patch_lines = []
+        for i in range(0, len(lines)):
+            line = lines[i]
+
+            if len(line) == 0:
+                patch_lines = lines[i+1:]
+                break
+
             o = self._parseDiffTree(line)
             if o:
                 diff_trees.append(o)
+
+        if len(patch_lines) > 0:
+            self._parseDiffTreePatch(diff_trees, patch_lines)
 
         return diff_trees
 
@@ -494,6 +504,22 @@ class Git(object):
 
         return diff_tree
 
+    def _parseDiffTreePatch(self, diff_trees, lines):
+        global patterns
+
+        cur = 0
+        patch = ''
+        for line in lines:
+            match = patterns['diff-tree-patch'].match(line)
+            if match and len(patch) > 0:
+                diff_trees[cur].patch = patch
+                cur += 1
+                patch = ''
+
+            patch += line + '\n'
+
+        if len(patch) > 0:
+            diff_trees[cur].patch = patch
 
     def _parsePerson(self, line):
         match = self._patterns['person'].match(line)

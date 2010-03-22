@@ -96,3 +96,11 @@ class TestGit(unittest.TestCase):
     def testDiffTree(self):
         commit = self.git.commit('9524370d6dd57241f7073441fc3de7e856565c62')
         print self.git.diffTree(commit)
+
+        ls = self.git.diffTree(commit, patch = True)
+        #for l in ls:
+        #    print l.patch
+        #    print
+        #    print '-----'
+        #    print
+
