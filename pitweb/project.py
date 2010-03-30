@@ -29,6 +29,7 @@ class ProjectBase(object):
         self._a       = args.get('a', 'log')
         self._id      = args.get('id', 'HEAD')
         self._id2     = args.get('id2', None)
+        self._treeid  = args.get('treeid', 'HEAD')
         self._showmsg = args.get('showmsg', '0')
         if self._showmsg == '0':
             self._showmsg = False
@@ -36,6 +37,7 @@ class ProjectBase(object):
             self._showmsg = True
 
         self._page    = int(args.get('page', '1'))
+        self._path    = args.get('path', '')
 
         self._commits_per_page = 50
 
@@ -74,23 +76,21 @@ class ProjectBase(object):
         return s
 
     def run(self):
+        self._section = self._a
         if self._a == 'log':
-            self._section = 'log'
             self.log(id = self._id, showmsg = self._showmsg, page = self._page)
         elif self._a == 'refs':
-            self._section = 'refs'
             self.refs()
         elif self._a == 'summary':
-            self._section = 'summary'
             self.summary()
         elif self._a == 'commit':
-            self._section = 'commit'
             self.commit(id = self._id)
         elif self._a == 'diff':
-            self._section = 'diff'
             self.diff(id = self._id, id2 = self._id2)
         elif self._a == 'patch':
             self.patch(id = self._id, id2 = self._id2)
+        elif self._a == 'tree':
+            self.tree(id = self._id, treeid = self._treeid, path = self._path)
 
         return apache.OK
 
@@ -236,6 +236,95 @@ class Project(ProjectBase):
         html += self.diffTreeTable(diff_trees)
 
         self.write(self.tpl(html))
+
+
+    def tree(self, id, treeid, path = ''):
+        html = ''
+
+        objs = self._git.tree(id = treeid)
+
+        spath = path.split('/')
+        spath = filter(lambda x: len(x) > 0, spath)
+        for p in spath:
+            found = False
+            for obj in objs:
+                if type(obj) is git.GitTree \
+                   and obj.name == p:
+                    objs = self._git.tree(id = obj.id)
+                    found = True
+                    break
+
+            if not found:
+                break
+
+        if len(spath) > 0:
+            html += '<div>'
+
+            html += 'path: '
+            html += self.anchor('root', v = { 'a' : 'tree', 'id' : self._id, 'treeid' : treeid }, cls = '')
+
+            for i in range(0, len(spath)):
+                v = { 'a' : 'tree',
+                      'id' : self._id,
+                      'treeid' : treeid,
+                      'path'   : string.join(spath[0:i+1], '/') }
+                html += ' / '
+                html += self.anchor(spath[i], v = v, cls = '')
+
+            html += '</div>'
+
+        html += '''<table class="tree">
+        <tr class="header">
+            <td>Mode</td>
+            <td>Size</td>
+            <td>Name</td>
+            <td></td>
+        </tr>
+        '''
+
+        if len(spath) > 0:
+            v = { 'a'      : 'tree',
+                  'id'     : self._id,
+                  'treeid' : treeid,
+                  'path'   : string.join(spath[:-1], '/') }
+            cls = 'tree'
+            aname = self.anchor('..', v = v, cls = cls)
+
+            html += '<tr>'
+            html += '<td>drwxr-xr-x</td>'
+            html += '<td></td>'
+            html += '<td>' + aname + '</td>'
+            html += '<td>' + '</td>'
+            html += '</tr>'
+            
+
+        for obj in objs:
+            if type(obj) is git.GitTree:
+                v = { 'a'      : 'tree',
+                      'id'     : self._id,
+                      'treeid' : treeid,
+                      'path'   : path + '/' + obj.name }
+                cls = 'tree'
+            else:
+                v = { 'a'      : 'blob',
+                      'id'     : self._id,
+                      'blobid' : obj.id,
+                      'treeid' : treeid,
+                      'path'   : path }
+                cls = 'blob'
+
+            aname = self.anchor(obj.name, v = v, cls = cls)
+
+            html += '<tr>'
+            html += '<td>' + obj.modeStr(obj.mode_oct) + '</td>'
+            html += '<td>' + obj.size + '</td>'
+            html += '<td>' + aname + '</td>'
+            html += '<td>' + '</td>'
+            html += '</tr>'
+        html += '</table>'
+
+        self.write(self.tpl(html))
+
 
 
     def headsTable(self, heads):
@@ -397,7 +486,7 @@ class Project(ProjectBase):
             </td>
             <td><a href="?a=commit;id={id}">commit</a></td>
             <td><a href="?a=diff;id={id}">diff</a></td>
-            <td><a href="?a=tree;id={tree};parent={id}">tree</a></td>
+            <td><a href="?a=tree;id={id};treeid={tree}">tree</a></td>
             <td><a href="?a=snapshot;id={id}">snapshot</a></td>
         </tr>
         '''
@@ -451,7 +540,10 @@ class Project(ProjectBase):
         </tr>'''.format(comm)
 
         # tree
-        tree = self.anchor(commit.tree, v = { 'a' : 'tree', 'id' : commit.tree }, cls = "")
+        v = { 'a'      : 'tree',
+              'id'     : commit.id,
+              'treeid' : commit.tree }
+        tree = self.anchor(commit.tree, v = v, cls = "")
         html += '''
         <tr>
             <td>tree</td>

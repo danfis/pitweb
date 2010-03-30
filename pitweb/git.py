@@ -190,7 +190,7 @@ class GitComm(object):
         return self._git(comm)
 
     def lsTree(self, obj = 'HEAD', recursive = False, long = False,
-                     full_tree = False):
+                     full_tree = False, zeroterm = True):
         comm = ['ls-tree']
 
         if recursive:
@@ -199,6 +199,8 @@ class GitComm(object):
             comm.append('--long')
         if full_tree:
             comm.append('--full-tree')
+        if zeroterm:
+            comm.append('-z')
 
         comm.append(obj)
         return self._git(comm)
@@ -289,6 +291,25 @@ class GitObj(object):
     def __str__(self):
         return '<{0} id={1}>'.format(self.__class__.__name__, self.id)
 
+    def modeIsGitlink(self, mode_oct):
+        return stat.S_IFMT(mode_oct) == 0160000
+
+    def modeStr(self, mode_oct):
+        if self.modeIsGitlink(mode_oct):
+            return 'm---------'
+        elif stat.S_ISDIR(mode_oct):
+            return 'drwxr-xr-x'
+        elif stat.S_ISREG(mode_oct):
+            # git cares only about the executable bit
+            if mode_oct & stat.S_IXUSR:
+                return '-rwxr-xr-x'
+            else:
+                return '-rw-r--r--'
+        elif stat.S_ISLNK(mode_oct):
+            return 'lrwxrwxrwx'
+        else:
+            return '----------'
+
 class GitCommit(GitObj):
     def __init__(self, git, id, tree, parents, author, committer, comment):
         super(GitCommit, self).__init__(git, id)
@@ -367,6 +388,29 @@ class GitDiffTree(GitObj):
             return 'symlink'
         else:
             return 'unknown'
+
+class GitTree(GitObj):
+    def __init__(self, git, id, name, mode, size):
+        super(GitTree, self).__init__(git, id)
+
+        self.name = name
+        self.mode = mode
+        self.size = size
+
+        self.mode_oct = int(mode, 8)
+
+class GitBlob(GitObj):
+    def __init__(self, git, id, name, mode, size, data = ''):
+        super(GitBlob, self).__init__(git, id)
+
+        self.name = name
+        self.mode = mode
+        self.size = size
+        self.data = data
+
+        self.mode_oct = int(mode, 8)
+
+
 
 class Git(object):
     def __init__(self, dir, gitbin = '/usr/bin/git'):
@@ -481,6 +525,29 @@ class Git(object):
 
     def formatPatch(self, id, id2):
         return self._git.formatPatch(id, id2)
+
+    def tree(self, id):
+        s = self._git.lsTree(id, long = True, zeroterm = True)
+
+        objs = []
+
+        lines = s.split('\x00')
+        for line in lines:
+            if len(line) > 0:
+                objs.append(self._parseTree(line))
+
+        return objs
+
+
+    def _parseTree(self, line):
+        p = line.split()
+
+        if p[1] == 'tree':
+            obj = GitTree(self, id = p[2], mode = p[0], size = p[3], name = p[4])
+        else:
+            obj = GitBlob(self, id = p[2], mode = p[0], size = p[3], name = p[4])
+
+        return obj
 
     def _parseDiffTree(self, line):
         global patterns
