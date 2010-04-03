@@ -400,7 +400,7 @@ class GitTree(GitObj):
         self.mode_oct = int(mode, 8)
 
 class GitBlob(GitObj):
-    def __init__(self, git, id, name, mode, size, data = ''):
+    def __init__(self, git, id, name = '', mode = '', size = '', data = ''):
         super(GitBlob, self).__init__(git, id)
 
         self.name = name
@@ -408,7 +408,9 @@ class GitBlob(GitObj):
         self.size = size
         self.data = data
 
-        self.mode_oct = int(mode, 8)
+        self.mode_oct = -1
+        if len(self.mode) > 0:
+            self.mode_oct = int(mode, 8)
 
 
 
@@ -538,6 +540,10 @@ class Git(object):
 
         return objs
 
+    def blob(self, id):
+        s = self._git.catFile(id, 'blob')
+        obj = GitBlob(self, id, data = s)
+        return obj
 
     def _parseTree(self, line):
         p = line.split()

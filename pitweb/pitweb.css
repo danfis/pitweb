@@ -18,7 +18,8 @@ a.branch { display: block-inline; background-color: #88ff88; border: 1px solid #
 a.remote { display: block-inline; background-color: #AAAAFF; border: 1px solid #8888ff; color: black;
            margin-left: 2px; margin-right: 2px;
            padding-left: 4px; padding-right: 4px; padding-top: 1px; padding-bottom: 1px; }
-
+a.blob { color: black; }
+a.menu { font-family: sans !important; font-size: 11px !important; }
 div.header { padding: 7px; margin-bottom: 20px; font-size: 20px; background-color: #edece6; }
 div.header .project { font-size: 18px; }
 
@@ -77,3 +78,10 @@ div.patch-add { color: #007000; }
 table.tree tr.header * { font-family: sans; }
 table.tree * { font-family: monospace; }
 table.tree a.blob { color: black; }
+
+
+div.blob * { font-family: monospace; }
+div.blob { border-top: 1px solid black; }
+div.blob-line * { white-space: pre; }
+span.blob-linenum { color: #999; display: block-inline; border-right: 1px solid black; }
+

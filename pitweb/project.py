@@ -2,6 +2,7 @@ from mod_python import apache, util
 import string
 import git
 import re
+import math
 
 ###
 # Sections:
@@ -30,6 +31,8 @@ class ProjectBase(object):
         self._id      = args.get('id', 'HEAD')
         self._id2     = args.get('id2', None)
         self._treeid  = args.get('treeid', 'HEAD')
+        self._blobid  = args.get('blobid', 'HEAD')
+        self._filename = args.get('filename', '')
         self._showmsg = args.get('showmsg', '0')
         if self._showmsg == '0':
             self._showmsg = False
@@ -91,6 +94,10 @@ class ProjectBase(object):
             self.patch(id = self._id, id2 = self._id2)
         elif self._a == 'tree':
             self.tree(id = self._id, treeid = self._treeid, path = self._path)
+        elif self._a == 'blob':
+            self._section = 'tree'
+            self.blob(id = self._id, blobid = self._blobid, treeid = self._treeid, \
+                      path = self._path, filename = self._filename)
 
         return apache.OK
 
@@ -257,21 +264,8 @@ class Project(ProjectBase):
             if not found:
                 break
 
-        if len(spath) > 0:
-            html += '<div>'
-
-            html += 'path: '
-            html += self.anchor('root', v = { 'a' : 'tree', 'id' : self._id, 'treeid' : treeid }, cls = '')
-
-            for i in range(0, len(spath)):
-                v = { 'a' : 'tree',
-                      'id' : self._id,
-                      'treeid' : treeid,
-                      'path'   : string.join(spath[0:i+1], '/') }
-                html += ' / '
-                html += self.anchor(spath[i], v = v, cls = '')
-
-            html += '</div>'
+        html += self.formatTreePath(path, treeid)
+        html += '<br />'
 
         html += '''<table class="tree">
         <tr class="header">
@@ -305,13 +299,22 @@ class Project(ProjectBase):
                       'treeid' : treeid,
                       'path'   : path + '/' + obj.name }
                 cls = 'tree'
+
+                menu = self.anchor('tree', v = v, cls = 'menu')
             else:
                 v = { 'a'      : 'blob',
                       'id'     : self._id,
                       'blobid' : obj.id,
                       'treeid' : treeid,
-                      'path'   : path }
+                      'path'   : path,
+                      'filename' : obj.name }
                 cls = 'blob'
+
+                vraw = { 'a'      : 'blob-raw',
+                         'blobid' : obj.id }
+                menu = self.anchor('blob', v = v, cls = 'menu')
+                menu += '|'
+                menu += self.anchor('raw', v = vraw, cls = 'menu')
 
             aname = self.anchor(obj.name, v = v, cls = cls)
 
@@ -319,11 +322,79 @@ class Project(ProjectBase):
             html += '<td>' + obj.modeStr(obj.mode_oct) + '</td>'
             html += '<td>' + obj.size + '</td>'
             html += '<td>' + aname + '</td>'
-            html += '<td>' + '</td>'
+            html += '<td>' + menu + '</td>'
             html += '</tr>'
         html += '</table>'
 
         self.write(self.tpl(html))
+
+
+    def blob(self, id, blobid, treeid, path = '', filename = ''):
+        html = ''
+
+        blob = self._git.blob(blobid)
+
+        html += self.formatTreePath(path, treeid, filename, blobid)
+        html += '<br />'
+        html += self.formatBlob(blob)
+
+        self.write(self.tpl(html))
+
+
+    def formatTreePath(self, path, treeid, blobname = None, blobid = None):
+        html = ''
+
+        spath = path.split('/')
+        spath = filter(lambda x: len(x) > 0, spath)
+        if len(spath) > 0 or blobname:
+            html += '<div>'
+
+            html += 'path: '
+            html += self.anchor('root', v = { 'a' : 'tree', 'id' : self._id, 'treeid' : treeid }, cls = '')
+
+            for i in range(0, len(spath)):
+                v = { 'a' : 'tree',
+                      'id' : self._id,
+                      'treeid' : treeid,
+                      'path'   : string.join(spath[0:i+1], '/') }
+                html += ' / '
+                html += self.anchor(spath[i], v = v, cls = '')
+
+            if blobname:
+                v = { 'a' : 'blob',
+                      'id' : self._id,
+                      'treeid' : treeid,
+                      'path'   : path,
+                      'blobid' : blobid,
+                      'filename' : blobname }
+                html += ' / '
+                html += self.anchor(blobname, v = v, cls = 'blob')
+
+            html += '</div>'
+
+        return html
+
+    def formatBlob(self, blob):
+        html = ''
+
+        lines = blob.data.split('\n')
+        if len(lines[-1]) == 0:
+            lines = lines[:-1]
+        digits = int(math.ceil(math.log(len(lines), 10)))
+
+        linepat = '<div class="blob-line">'
+        linepat += '<span class="blob-linenum"> {{0: >{0}d}} </span>'
+        linepat += '<span class="blob-line"> {{1}}</span>'
+        linepat += '</div>'
+        linepat = linepat.format(digits)
+
+        html += '<div class="blob">'
+        for i in range(0, len(lines)):
+            line = lines[i]
+            html += linepat.format(i + 1, self.esc(line))
+        html += '</div>'
+
+        return html
 
 
 
@@ -622,9 +693,9 @@ class Project(ProjectBase):
                 change = change.format(self.esc(d.from_file), d.similarity)
                 html += '<td class="diff-tree-RC">{0}</td>'.format(change)
 
-            menu = '<a href="#{0}">diff</a>'.format(d.from_id + d.to_id)
+            menu = '<a href="#{0}" class="menu">diff</a>'.format(d.from_id + d.to_id)
             menu += '&nbsp;|&nbsp;'
-            menu += self.anchor('blob', v = { 'a' : 'blob', 'id' : d.to_id }, cls = "")
+            menu += self.anchor('blob', v = { 'a' : 'blob', 'id' : d.to_id }, cls = "menu")
 
             html += '<td class="diff-tree-menu">{0}</td>'.format(menu)
             html += '</tr>'
