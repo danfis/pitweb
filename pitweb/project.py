@@ -22,10 +22,12 @@ class ProjectBase(object):
     """ HTML interface for project specified by its directory. """
 
     def __init__(self, dir, req):
-        self._git = git.Git(dir)
+        self._dir = dir
         self._req = req
 
-        self._project_name = 'Project'
+        self._git = git.Git(dir)
+
+        self._setProjectName()
 
         args = self._parseArgs()
         self._a       = args.get('a', 'summary')
@@ -44,6 +46,19 @@ class ProjectBase(object):
         self._path    = args.get('path', '')
 
         self._commits_per_page = 50
+
+    def _setProjectName(self):
+        name = ''
+
+        p = self._dir.split('/')
+        p = filter(lambda x: len(x) > 0, p)
+        if len(p) > 0:
+            name = p[-1]
+            if len(name) > 4 and name[-4:] == '.git':
+                name = name[:-4]
+
+        self._project_name = name
+
 
     def _parseArgs(self):
         args = {}
