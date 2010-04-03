@@ -1,9 +1,11 @@
 from mod_python import apache, util
 import string
-import git
 import re
 import math
 import mimetypes
+import os
+
+import git
 
 ###
 # Sections:
@@ -738,9 +740,19 @@ class Project(ProjectBase):
         </tr>'''.format(len(diff_trees))
 
         for d in diff_trees:
+            path = d.to_file.rsplit('/', 1)
+            blobpath     = path[0]
+            blobfilename = path[1]
+
+            blobv = { 'a'        : 'blob',
+                      'id'       : self._id,
+                      'blobid'   : d.to_id,
+                      'path'     : blobpath,
+                      'filename' : blobfilename }
+
             html += '<tr>'
 
-            anchor = self.anchor(self.esc(d.to_file), v = { 'a' : 'blob', 'id' : d.to_id }, cls = "diff-tree-file")
+            anchor = self.anchor(self.esc(d.to_file), v = blobv, cls = "diff-tree-file")
             html += '<td>{0}</td>'.format(anchor)
 
             if d.status == 'A': # added
@@ -775,7 +787,7 @@ class Project(ProjectBase):
 
             menu = '<a href="#{0}" class="menu">diff</a>'.format(d.from_id + d.to_id)
             menu += '&nbsp;|&nbsp;'
-            menu += self.anchor('blob', v = { 'a' : 'blob', 'id' : d.to_id }, cls = "menu")
+            menu += self.anchor('blob', v = blobv, cls = "menu")
 
             html += '<td class="diff-tree-menu">{0}</td>'.format(menu)
             html += '</tr>'
@@ -812,14 +824,32 @@ class Project(ProjectBase):
         # header line
         m = pat_head.match(lines[cur])
         if m:
+            path = d.to_file.rsplit('/', 1)
+            blobpath     = path[0]
+            blobfilename = path[1]
+            blobv1 = { 'a'        : 'blob',
+                       'id'       : self._id,
+                       'blobid'   : d.to_id,
+                       'path'     : blobpath,
+                       'filename' : blobfilename }
+
+            path = d.from_file.rsplit('/', 1)
+            blobpath     = path[0]
+            blobfilename = path[1]
+            blobv2 = { 'a'        : 'blob',
+                       'id'       : self._id,
+                       'blobid'   : d.from_id,
+                       'path'     : blobpath,
+                       'filename' : blobfilename }
+
             a = m.group(1)
             b = m.group(2)
             html += '<a name="{0}"></a>'.format(d.from_id + d.to_id)
             html += '<div class="patch-header">'
             html += 'diff --git '
-            html += self.anchor(a, v = { 'a' : 'tree', 'f' : a[2:], 'id' : d.from_id }, cls = '')
+            html += self.anchor(a, v = blobv1, cls = '')
             html += '&nbsp;'
-            html += self.anchor(b, v = { 'a' : 'tree', 'f' : b[2:], 'id' : d.to_id }, cls = '')
+            html += self.anchor(b, v = blobv2, cls = '')
             html += '</div>'
             cur += 1
 
@@ -829,14 +859,7 @@ class Project(ProjectBase):
                 html += lines[cur] + '<br />'
             cur += 1
         if cur < length:
-            m = pat_index.match(lines[cur])
-            a = m.group(1)
-            b = m.group(2)
-            html += 'index '
-            html += self.anchor(a, v = { 'a' : 'tree', 'f' : a, 'id' : d.from_id }, cls = '')
-            html += '..'
-            html += self.anchor(b, v = { 'a' : 'tree', 'f' : b, 'id' : d.to_id }, cls = '')
-            html += str(m.group(3))
+            html += lines[cur]
         html += '</div>'
         cur += 1
 
