@@ -681,7 +681,7 @@ class Project(ProjectBase):
         # commit
         comm = self.anchorCommit(commit.id, commit.id)
         comm += '&nbsp;&nbsp;('
-        comm += self.anchor('patch', v = { 'a' : 'patch', 'id' : commit.id }, cls = "")
+        comm += self.anchor('patch', v = { 'a' : 'patch', 'id' : commit.id }, cls = "menu")
         comm += ')'
         html += '''
         <tr>
@@ -705,10 +705,10 @@ class Project(ProjectBase):
         for parent in commit.parents:
             par = self.anchorCommit(parent, parent)
             par += '&nbsp;&nbsp;('
-            par += self.anchor('diff', v = { 'a' : 'diff', 'id' : parent, 'id2' : commit.id }, cls = "")
+            par += self.anchor('diff', v = { 'a' : 'diff', 'id' : parent, 'id2' : commit.id }, cls = "menu")
             par += ')'
             par += '&nbsp;&nbsp;('
-            par += self.anchor('patch', v = { 'a' : 'patch', 'id' : parent, 'id2' : commit.id }, cls = "")
+            par += self.anchor('patch', v = { 'a' : 'patch', 'id' : parent, 'id2' : commit.id }, cls = "menu")
             par += ')'
             html += '''
             <tr>
