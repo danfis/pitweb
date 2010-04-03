@@ -28,10 +28,10 @@ class ProjectBase(object):
         self._project_name = 'Project'
 
         args = self._parseArgs()
-        self._a       = args.get('a', 'log')
+        self._a       = args.get('a', 'summary')
         self._id      = args.get('id', 'HEAD')
         self._id2     = args.get('id2', None)
-        self._treeid  = args.get('treeid', 'HEAD')
+        self._treeid  = args.get('treeid', self._id)
         self._blobid  = args.get('blobid', 'HEAD')
         self._filename = args.get('filename', '')
         self._showmsg = args.get('showmsg', '0')
@@ -570,15 +570,20 @@ class Project(ProjectBase):
             for r in commit.remotes:
                 h += self.anchorLog('remotes/' + self.esc(r.name), r.id, showmsg, 1, cls = "remote")
 
-            h += '''
-            {longcomment}
-            </td>
-            <td><a href="?a=commit;id={id}">commit</a></td>
-            <td><a href="?a=diff;id={id}">diff</a></td>
-            <td><a href="?a=tree;id={id};treeid={tree}">tree</a></td>
-            <td><a href="?a=snapshot;id={id}">snapshot</a></td>
-        </tr>
-        '''
+            h += '{longcomment}</td>'
+            h += '<td>'
+            h += self.anchor('commit', v = { 'a' : 'commit', 'id' : commit.id }, cls = 'menu') 
+            h += '&nbsp;|&nbsp;'
+            h += self.anchor('diff', v = { 'a' : 'diff', 'id' : commit.id }, cls = 'menu')
+            h += '&nbsp;|&nbsp;'
+            v = { 'a'      : 'tree',
+                  'id'     : commit.id,
+                  'treeid' : commit.tree }
+            h += self.anchor('tree', v = v, cls = 'menu')
+            #h += '&nbsp;|&nbsp;'
+            #h += self.anchor('snapshot', v = {}, cls = 'menu')
+            h += '</td>'
+            h += '</tr>'
 
             longcomment = ''
             if showmsg:
