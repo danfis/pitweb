@@ -3,6 +3,7 @@ import string
 import git
 import re
 import math
+import mimetypes
 
 ###
 # Sections:
@@ -98,6 +99,8 @@ class ProjectBase(object):
             self._section = 'tree'
             self.blob(id = self._id, blobid = self._blobid, treeid = self._treeid, \
                       path = self._path, filename = self._filename)
+        elif self._a == 'blob-raw':
+            self.blobRaw(blobid = self._blobid, filename = self._filename)
 
         return apache.OK
 
@@ -106,6 +109,8 @@ class ProjectBase(object):
 
     def setContentType(self, type):
         self._req.content_type = type
+    def setFilename(self, filename):
+        self._req.headers_out['Content-disposition'] = ' attachment; filename="{0}"'.format(filename)
 
 
 
@@ -310,8 +315,9 @@ class Project(ProjectBase):
                       'filename' : obj.name }
                 cls = 'blob'
 
-                vraw = { 'a'      : 'blob-raw',
-                         'blobid' : obj.id }
+                vraw = { 'a'        : 'blob-raw',
+                         'filename' : obj.name,
+                         'blobid'   : obj.id }
                 menu = self.anchor('blob', v = v, cls = 'menu')
                 menu += '|'
                 menu += self.anchor('raw', v = vraw, cls = 'menu')
@@ -339,6 +345,18 @@ class Project(ProjectBase):
         html += self.formatBlob(blob)
 
         self.write(self.tpl(html))
+
+
+    def blobRaw(self, blobid, filename):
+        blob = self._git.blob(blobid)
+        type = mimetypes.guess_type(filename)
+        mime_type = type[0]
+        if not mime_type:
+            mime_type = 'application/octet-stream'
+
+        self.setContentType(mime_type)
+        self.setFilename(filename)
+        self.write(blob.data)
 
 
     def formatTreePath(self, path, treeid, blobname = None, blobid = None):
