@@ -44,6 +44,7 @@ class ProjectBase(object):
 
         self._page    = int(args.get('page', '1'))
         self._path    = args.get('path', '')
+        self._format  = args.get('format', 'tgz')
 
         self._commits_per_page = 50
 
@@ -116,6 +117,8 @@ class ProjectBase(object):
                       path = self._path, filename = self._filename)
         elif self._a == 'blob-raw':
             self.blobRaw(blobid = self._blobid, filename = self._filename)
+        elif self._a == 'snapshot':
+            self.snapshot(id = self._id, format = self._format)
 
         return apache.OK
 
@@ -134,6 +137,17 @@ class Project(ProjectBase):
         super(Project, self).__init__(dir, req)
 
         self._tags, self._heads, self._remotes = self._git.refs()
+
+
+    def _fileOut(self, data, filename):
+        type = mimetypes.guess_type(filename)
+        mime_type = type[0]
+        if not mime_type:
+            mime_type = 'application/octet-stream'
+
+        self.setContentType(mime_type)
+        self.setFilename(filename)
+        self.write(data)
 
 
     def anchor(self, html, cls, v):
@@ -364,14 +378,12 @@ class Project(ProjectBase):
 
     def blobRaw(self, blobid, filename):
         blob = self._git.blob(blobid)
-        type = mimetypes.guess_type(filename)
-        mime_type = type[0]
-        if not mime_type:
-            mime_type = 'application/octet-stream'
+        return self._fileOut(blob.data, filename)
 
-        self.setContentType(mime_type)
-        self.setFilename(filename)
-        self.write(blob.data)
+    def snapshot(self, id, format):
+        (data, filename) = self._git.archive(id, self._project_name, format)
+        return self._fileOut(data, filename)
+
 
 
     def formatTreePath(self, path, treeid, blobname = None, blobid = None):
@@ -491,7 +503,10 @@ class Project(ProjectBase):
             html += '<td>' + self.esc(t.msg) + '</td>'
             html += '<td><i>' + self.esc(t.tagger.name()) + '</i></td>'
             html += '<td>' + t.tagger.date.format('%Y-%m-%d') + '</td>'
-            html += '<td>' + '</td>'
+
+            html += '<td>'
+            html += self.menuLinks(t.name, t.id)
+            html += '</td>'
             html += '</tr>'
 
         if len(tags) > max:
@@ -537,6 +552,42 @@ class Project(ProjectBase):
 
         html += '</table>'
         return html
+
+    def snapshotLinks(self, id):
+        v = { 'a'      : 'snapshot',
+              'id'     : id,
+              'format' : 'tgz' }
+
+        html = ''
+        html += self.anchor('.tar.gz', v = v, cls = 'menu')
+
+        html += ',&nbsp;'
+
+        v['format'] = 'tbz2'
+        html += self.anchor('.tar.bz2', v = v, cls = 'menu')
+
+        return html
+
+    def menuLinks(self, id, treeid = None):
+        html = ''
+
+        html += self.anchor('commit', v = { 'a' : 'commit', 'id' : id }, cls = 'menu') 
+
+        html += '&nbsp;|&nbsp;'
+        html += self.anchor('diff', v = { 'a' : 'diff', 'id' : id }, cls = 'menu')
+
+        if treeid:
+            html += '&nbsp;|&nbsp;'
+            v = { 'a'      : 'tree',
+                  'id'     : id,
+                  'treeid' : treeid }
+            html += self.anchor('tree', v = v, cls = 'menu')
+
+        html += '&nbsp;|&nbsp;'
+        html += self.snapshotLinks(id)
+
+        return html
+
 
     def logTable(self, commits, id = 'HEAD', longcomment = False, showmsg = False, page = 1):
         html = ''
@@ -586,16 +637,7 @@ class Project(ProjectBase):
 
             h += '{longcomment}</td>'
             h += '<td>'
-            h += self.anchor('commit', v = { 'a' : 'commit', 'id' : commit.id }, cls = 'menu') 
-            h += '&nbsp;|&nbsp;'
-            h += self.anchor('diff', v = { 'a' : 'diff', 'id' : commit.id }, cls = 'menu')
-            h += '&nbsp;|&nbsp;'
-            v = { 'a'      : 'tree',
-                  'id'     : commit.id,
-                  'treeid' : commit.tree }
-            h += self.anchor('tree', v = v, cls = 'menu')
-            #h += '&nbsp;|&nbsp;'
-            #h += self.anchor('snapshot', v = {}, cls = 'menu')
+            h += self.menuLinks(commit.id, commit.tree)
             h += '</td>'
             h += '</tr>'
 
@@ -652,6 +694,7 @@ class Project(ProjectBase):
               'id'     : commit.id,
               'treeid' : commit.tree }
         tree = self.anchor(commit.tree, v = v, cls = "")
+        tree += '&nbsp;&nbsp;(' + self.snapshotLinks(commit.id) + ')'
         html += '''
         <tr>
             <td>tree</td>

@@ -91,12 +91,15 @@ class GitComm(object):
         self._dir = dir
         self._gitbin = gitbin
 
-    def _git(self, args):
+    def _gitPipe(self, args):
         comm = [self._gitbin, '--git-dir={0}'.format(self._dir)]
         comm.extend(args)
 
         pipe = Popen(comm, stdout = PIPE, stderr = STDOUT)
-        #out = pipe.stdout.readlines()
+        return pipe
+
+    def _git(self, args):
+        pipe = self._gitPipe(args)
         out = pipe.stdout.read()
         pipe.stdout.close()
 
@@ -214,6 +217,20 @@ class GitComm(object):
 
         return self._git(comm)
 
+    def archive(self, id, format = 'tar', prefix = 'a/', compress = None):
+        comm = ['archive']
+        comm.append('--format={0}'.format(format))
+        comm.append('--prefix={0}'.format(prefix))
+        comm.append(id)
+
+        if compress:
+            pipe = self._gitPipe(comm)
+            compressor = Popen([compress], stdout = PIPE, stderr = STDOUT, stdin = pipe.stdout)
+            s = compressor.stdout.read()
+            compressor.stdout.close()
+            return s
+        else:
+            return self._git(comm)
 
 class GitDate(object):
     def __init__(self, epoch, tz):
@@ -537,6 +554,27 @@ class Git(object):
         s = self._git.catFile(id, 'blob')
         obj = GitBlob(self, id, data = s)
         return obj
+
+
+    def archive(self, id, project, type):
+        name = project + '-' + id
+
+        if type == 'tgz':
+            arch = self._git.archive(id, 'tar', name + '/', 'gzip')
+            filename = name + '.tar.gz'
+        elif type == 'tbz2':
+            arch = self._git.archive(id, 'tar', name + '/', 'bzip2')
+            filename = name + '.tar.bz2'
+        elif type == 'txz':
+            arch = self._git.archive(id, 'tar', name + '/', 'xz')
+            filename = name + '.tar.xz'
+        elif type == 'zip':
+            arch = self._git.archive(id, 'zip', name + '/')
+            filename = name + '.zip'
+
+        return (arch, filename)
+
+
 
     def _parseTree(self, line):
         p = line.split()
