@@ -548,7 +548,6 @@ class Project(ProjectBase):
         '''.format(expand)
 
         for commit in commits:
-
             h = '''
         <tr>
             <td>{date}</td>

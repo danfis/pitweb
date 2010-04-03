@@ -6,7 +6,7 @@ import stat
 basic_patterns = {
     'id' : r'[0-9a-fA-F]{40}',
     'epoch' : r'[0-9]+',
-    'tz'    : r'\+[0-9]+',
+    'tz'    : r'[\+-][0-9]+',
 }
 
 patterns = {
@@ -14,13 +14,6 @@ patterns = {
     'person2'   : re.compile(r'(.*) <(.*)>'),
 	'diff-tree' : re.compile(r'^:([0-7]{6}) ([0-7]{6}) ([0-9a-fA-F]{40}) ([0-9a-fA-F]{40}) (.)([0-9]{0,3})\t(.*)$'),
 	'diff-tree-patch' : re.compile(r'^diff --git'),
-    'rev-list' : {
-        'header'   : re.compile(r'^({0})( {0})*'.format(basic_patterns['id'])),
-        'tree'     : re.compile(r'^tree ({0})$'.format(basic_patterns['id'])),
-        'parent'   : re.compile(r'^parent ({0})$'.format(basic_patterns['id'])),
-        'author'   : re.compile(r'^author (.*) ({epoch}) ({tz})$'.format(**basic_patterns)),
-        'committer' : re.compile(r'^committer (.*) ({epoch}) ({tz})$'.format(**basic_patterns)),
-    },
 }
 
 #Interrogation commands
@@ -596,9 +589,18 @@ class Git(object):
             diff_trees[cur].patch = patch
 
     def _parsePerson(self, line):
+        person = line
+        epoch = '0'
+        tz = '+0000'
+
         match = self._patterns['person'].match(line)
-        date   = GitDate(epoch = match.group(2), tz = match.group(3))
-        person = GitPerson(person = match.group(1), date = date)
+        if match:
+            person = match.group(1)
+            epoch  = match.group(2)
+            tz     = match.group(3)
+
+        date   = GitDate(epoch = epoch, tz = tz)
+        person = GitPerson(person = person, date = date)
         return person
 
     def _parseIdParents(self, line):
@@ -643,10 +645,12 @@ class Git(object):
         objid = ''
         name  = ''
         msg   = ''
+        tagger = None
 
         for line in lines:
             if readmsg:
                 msg += line
+                break # read only first line
             elif line[:6] == 'object':
                 objid = line[7:]
             elif line[:4] == 'tag ':
@@ -656,11 +660,8 @@ class Git(object):
             elif len(line) == 0:
                 readmsg = True
                 
+        if not tagger:
+            tagger = self._parsePerson('')
+
         tag = GitTag(self, id = id, objid = objid, name = name, msg = msg, tagger = tagger)
         return tag
-
-if __name__ == '__main__':
-    git = GitComm('../.git')
-
-    print git.catFile(size = True)
-    print git.revList(parents = True, header = True, max_count = 1)
