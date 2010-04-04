@@ -7,18 +7,6 @@ import os
 
 import git
 
-###
-# Sections:
-#   - summary (like gitweb)
-#   - log (like cgit)
-#   - commit
-#   - commitdiff
-#   - tree
-#   - refs (cgit)
-#   
-#   - snapshot
-#   - tag
-#   - patch
 
 class ProjectBase(object):
     """ HTML interface for project specified by its directory. """
@@ -86,11 +74,7 @@ class ProjectBase(object):
     def setCommitsPerPage(self, p):
         self._commits_per_page = p
 
-    def dbg(self, *args):
-        s = string.join(map(lambda x: str(x), args), ' ')
-        self._req.write(s)
-
-    def esc(self, s):
+    def _esc(self, s):
         """ Replaces special characters in s by HTML escape sequences """
         s = s.replace('<', '&lt;')
         s = s.replace('>', '&gt;')
@@ -204,7 +188,7 @@ class Project(ProjectBase):
         nav += '</div>'
 
         html += nav
-        html += self.logTable(commits, longcomment = True, id = id, showmsg = showmsg, page = page)
+        html += self._fLog(commits, longcomment = True, id = id, showmsg = showmsg, page = page)
         html += nav
 
         self.write(self.tpl(html))
@@ -217,17 +201,17 @@ class Project(ProjectBase):
 
         # heads
         if len(heads) > 0:
-            html += self.headsTable(heads)
+            html += self._fHeads(heads)
             html += '<br />'
 
         # tags
         if len(tags) > 0:
-            html += self.tagsTable(tags)
+            html += self._fTags(tags)
             html += '<br />'
 
         # remotes
         if len(remotes) > 0:
-            html += self.remotesTable(remotes)
+            html += self._fRemotes(remotes)
             html += '<br />'
 
         self.write(self.tpl(html))
@@ -240,14 +224,14 @@ class Project(ProjectBase):
         html = ''
 
         if len(heads) > 0:
-            html += self.headsTable(heads)
+            html += self._fHeads(heads)
             html += '<br />'
 
         if len(tags) > 0:
-            html += self.tagsTable(tags, 10)
+            html += self._fTags(tags, 10)
             html += '<br />'
 
-        html += self.logTable(commits)
+        html += self._fLog(commits)
 
         self.write(self.tpl(html))
 
@@ -261,9 +245,9 @@ class Project(ProjectBase):
 
         html = ''
         if commit:
-            html += self.commitInfo(commit)
+            html += self._fCommitInfo(commit)
             html += '<br />'
-            html += self.diffTreeTable(diff_trees)
+            html += self._fDiffTree(diff_trees)
 
         self.write(self.tpl(html))
 
@@ -276,7 +260,7 @@ class Project(ProjectBase):
         diff_trees = self._git.diffTree(id, id2, patch = True)
 
         html = ''
-        html += self.diffTreeTable(diff_trees)
+        html += self._fDiffTree(diff_trees)
 
         self.write(self.tpl(html))
 
@@ -300,7 +284,7 @@ class Project(ProjectBase):
             if not found:
                 break
 
-        html += self.formatTreePath(path, treeid)
+        html += self._fTreePath(path, treeid)
         html += '<br />'
 
         html += '''<table class="tree">
@@ -371,9 +355,9 @@ class Project(ProjectBase):
 
         blob = self._git.blob(blobid)
 
-        html += self.formatTreePath(path, treeid, filename, blobid)
+        html += self._fTreePath(path, treeid, filename, blobid)
         html += '<br />'
-        html += self.formatBlob(blob)
+        html += self._fBlob(blob)
 
         self.write(self.tpl(html))
 
@@ -388,7 +372,7 @@ class Project(ProjectBase):
 
 
 
-    def formatTreePath(self, path, treeid, blobname = None, blobid = None):
+    def _fTreePath(self, path, treeid, blobname = None, blobid = None):
         html = ''
 
         spath = path.split('/')
@@ -421,7 +405,7 @@ class Project(ProjectBase):
 
         return html
 
-    def formatBlob(self, blob):
+    def _fBlob(self, blob):
         html = ''
 
         lines = blob.data.split('\n')
@@ -438,14 +422,14 @@ class Project(ProjectBase):
         html += '<div class="blob">'
         for i in range(0, len(lines)):
             line = lines[i]
-            html += linepat.format(i + 1, self.esc(line))
+            html += linepat.format(i + 1, self._esc(line))
         html += '</div>'
 
         return html
 
 
 
-    def headsTable(self, heads):
+    def _fHeads(self, heads):
         html = '''
         <table class="refs">
         <tr class="header">
@@ -459,7 +443,7 @@ class Project(ProjectBase):
         for h in heads:
             comm = h.commit()
 
-            line = self.esc(comm.commentFirstLine())
+            line = self._esc(comm.commentFirstLine())
             line = line.replace('{', '{{').replace('}', '}}')
             v = { 'a'  : 'log',
                   'id' : comm.id }
@@ -467,7 +451,7 @@ class Project(ProjectBase):
 
             v = { 'a' : 'log',
                   'id' : h.id }
-            nameanchor = self.anchor(self.esc(h.name), v = v, cls = 'head')
+            nameanchor = self.anchor(self._esc(h.name), v = v, cls = 'head')
 
             html += '<tr>'
             html += '<td>' + nameanchor + '</td>'
@@ -480,7 +464,7 @@ class Project(ProjectBase):
         html += '</table>'
         return html
 
-    def tagsTable(self, tags, max = None):
+    def _fTags(self, tags, max = None):
         html = '''
         <table class="refs">
         <tr class="header">
@@ -498,16 +482,16 @@ class Project(ProjectBase):
         for t in tags[:max]:
             v = { 'a' : 'log',
                   'id' : t.id }
-            nameanchor = self.anchor(self.esc(t.name), v = v, cls = 'ref_tag')
+            nameanchor = self.anchor(self._esc(t.name), v = v, cls = 'ref_tag')
 
             html += '<tr>'
             html += '<td>' + nameanchor + '</td>'
-            html += '<td>' + self.esc(t.msg) + '</td>'
-            html += '<td><i>' + self.esc(t.tagger.name()) + '</i></td>'
+            html += '<td>' + self._esc(t.msg) + '</td>'
+            html += '<td><i>' + self._esc(t.tagger.name()) + '</i></td>'
             html += '<td>' + t.tagger.date.format('%Y-%m-%d') + '</td>'
 
             html += '<td>'
-            html += self.menuLinks(t.name, t.id)
+            html += self._fMenuLinks(t.name, t.id)
             html += '</td>'
             html += '</tr>'
 
@@ -519,7 +503,7 @@ class Project(ProjectBase):
         html += '<br />'
         return html
 
-    def remotesTable(self, remotes):
+    def _fRemotes(self, remotes):
         html = '''
         <table class="refs">
         <tr class="header">
@@ -533,7 +517,7 @@ class Project(ProjectBase):
         for r in remotes:
             comm = r.commit()
 
-            line = self.esc(comm.commentFirstLine())
+            line = self._esc(comm.commentFirstLine())
             line = line.replace('{', '{{').replace('}', '}}')
 
             v = { 'a'  : 'log',
@@ -542,12 +526,12 @@ class Project(ProjectBase):
 
             v = { 'a' : 'log',
                   'id' : r.id }
-            nameanchor = self.anchor(self.esc(r.name), v = v, cls = 'ref_remote')
+            nameanchor = self.anchor(self._esc(r.name), v = v, cls = 'ref_remote')
 
             html += '<tr>'
             html += '<td>' + nameanchor + '</td>'
             html += '<td>' + commanchor + '</td>'
-            html += '<td><i>' + self.esc(comm.author.name()) + '</i></td>'
+            html += '<td><i>' + self._esc(comm.author.name()) + '</i></td>'
             html += '<td>' + comm.author.date.format('%Y-%m-%d') + '</td>'
             html += '<td>' + '</td>'
             html += '</tr>'
@@ -555,7 +539,7 @@ class Project(ProjectBase):
         html += '</table>'
         return html
 
-    def snapshotLinks(self, id):
+    def _fSnapshotLinks(self, id):
         v = { 'a'      : 'snapshot',
               'id'     : id,
               'format' : 'tgz' }
@@ -570,7 +554,7 @@ class Project(ProjectBase):
 
         return html
 
-    def menuLinks(self, id, treeid = None):
+    def _fMenuLinks(self, id, treeid = None):
         html = ''
 
         html += self.anchor('commit', v = { 'a' : 'commit', 'id' : id }, cls = 'menu') 
@@ -586,12 +570,12 @@ class Project(ProjectBase):
             html += self.anchor('tree', v = v, cls = 'menu')
 
         html += '&nbsp;|&nbsp;'
-        html += self.snapshotLinks(id)
+        html += self._fSnapshotLinks(id)
 
         return html
 
 
-    def logTable(self, commits, id = 'HEAD', longcomment = False, showmsg = False, page = 1):
+    def _fLog(self, commits, id = 'HEAD', longcomment = False, showmsg = False, page = 1):
         html = ''
 
         expand = ''
@@ -622,35 +606,35 @@ class Project(ProjectBase):
             <td><i>{author}</i></td>
             <td>'''
 
-            line = self.esc(commit.commentFirstLine())
+            line = self._esc(commit.commentFirstLine())
             line = line.replace('{', '{{')
             line = line.replace('}', '}}')
 
             h += self.anchorCommit(line, commit.id, cls = 'comment')
 
             for b in commit.heads:
-                h += self.anchorLog(self.esc(b.name), b.id, showmsg, 1, cls = "branch")
+                h += self.anchorLog(self._esc(b.name), b.id, showmsg, 1, cls = "branch")
 
             for t in commit.tags:
-                h += self.anchorLog(self.esc(t.name), t.id, showmsg, 1, cls = "tag")
+                h += self.anchorLog(self._esc(t.name), t.id, showmsg, 1, cls = "tag")
 
             for r in commit.remotes:
-                h += self.anchorLog('remotes/' + self.esc(r.name), r.id, showmsg, 1, cls = "remote")
+                h += self.anchorLog('remotes/' + self._esc(r.name), r.id, showmsg, 1, cls = "remote")
 
             h += '{longcomment}</td>'
             h += '<td>'
-            h += self.menuLinks(commit.id, commit.tree)
+            h += self._fMenuLinks(commit.id, commit.tree)
             h += '</td>'
             h += '</tr>'
 
             longcomment = ''
             if showmsg:
                 longcomment  = '<div class="commit-msg"><br />'
-                longcomment += self.esc(commit.commentRestLines().strip(' \n\t'))
+                longcomment += self._esc(commit.commentRestLines().strip(' \n\t'))
                 longcomment += '</div><br />'
 
             html += h.format(id          = commit.id,
-                             author      = self.esc(commit.author.name()),
+                             author      = self._esc(commit.author.name()),
                              date        = commit.author.date.format('%Y-%m-%d'),
                              longcomment = longcomment,
                              tree        = commit.tree)
@@ -659,8 +643,8 @@ class Project(ProjectBase):
         return html
 
 
-    def commitInfoPerson(self, title, person):
-        p = self.esc(person.person)
+    def _fCommitInfoPerson(self, title, person):
+        p = self._esc(person.person)
         date = person.date.format('%Y-%m-%d %H:%M:%S')
         date += ' (' + person.date.local_tz + ')'
         html = '''
@@ -672,13 +656,13 @@ class Project(ProjectBase):
         '''.format(title = title, p = p, date = date)
         return html
 
-    def commitInfo(self, commit):
+    def _fCommitInfo(self, commit):
         html = ''
         html += '<table class="commit-info">'
 
         # author, committer
-        html += self.commitInfoPerson('author', commit.author)
-        html += self.commitInfoPerson('committer', commit.committer)
+        html += self._fCommitInfoPerson('author', commit.author)
+        html += self._fCommitInfoPerson('committer', commit.committer)
 
         # commit
         comm = self.anchorCommit(commit.id, commit.id)
@@ -696,7 +680,7 @@ class Project(ProjectBase):
               'id'     : commit.id,
               'treeid' : commit.tree }
         tree = self.anchor(commit.tree, v = v, cls = "")
-        tree += '&nbsp;&nbsp;(' + self.snapshotLinks(commit.id) + ')'
+        tree += '&nbsp;&nbsp;(' + self._fSnapshotLinks(commit.id) + ')'
         html += '''
         <tr>
             <td>tree</td>
@@ -722,14 +706,18 @@ class Project(ProjectBase):
         html += '</table>'
 
         # comment
-        short = self.esc(commit.commentFirstLine())
-        rest  = self.esc(commit.commentRestLines().strip(' \n\t'))
+        short = self._esc(commit.commentFirstLine())
+        rest  = self._esc(commit.commentRestLines().strip(' \n\t'))
         html += '''<h3 class="commit-info">{short}</h3>
                    <div class="commit-msg">{rest}</div>'''.format(short = short, rest = rest)
         return html
 
-    def diffTreeTable(self, diff_trees):
+    def _fDiffTree(self, diff_trees):
         html = ''
+
+        if len(diff_trees) == 0:
+            return html
+
         html += '<table class="diff-tree">'
         html += '''
         <tr>
@@ -756,7 +744,7 @@ class Project(ProjectBase):
 
             html += '<tr>'
 
-            anchor = self.anchor(self.esc(d.to_file), v = blobv, cls = "diff-tree-file")
+            anchor = self.anchor(self._esc(d.to_file), v = blobv, cls = "diff-tree-file")
             html += '<td>{0}</td>'.format(anchor)
 
             if d.status == 'A': # added
@@ -786,7 +774,7 @@ class Project(ProjectBase):
                 if d.status == 'C':
                     change = 'copied'
                 change += ' from <span class="diff-tree-RC-file">{0}</span> with {1} similarity]'
-                change = change.format(self.esc(d.from_file), d.similarity)
+                change = change.format(self._esc(d.from_file), d.similarity)
                 html += '<td class="diff-tree-RC">{0}</td>'.format(change)
 
             menu = '<a href="#{0}" class="menu">diff</a>'.format(d.from_id + d.to_id)
@@ -800,18 +788,18 @@ class Project(ProjectBase):
 
         html += '<br />'
 
-        html += self.diffTreePatch(diff_trees)
+        html += self._fDiffTreePatch(diff_trees)
 
         return html
 
-    def diffTreePatch(self, diff_trees):
+    def _fDiffTreePatch(self, diff_trees):
         html = ''
 
         for d in diff_trees:
-            html += self._formatPatch(d, d.patch)
+            html += self._fPatch(d, d.patch)
         return html
 
-    def _formatPatch(self, d, patch):
+    def _fPatch(self, d, patch):
         pat_head  = re.compile(r'^diff --git (a/.*) (b/.*)$')
         pat_index = re.compile(r'^index ([^\.]*)..([^ ]*)(.*)$')
         pat_from_file = re.compile(r'^---')
@@ -902,6 +890,7 @@ class Project(ProjectBase):
 
         return html
 
+
     def tpl(self, content):
         header = '<span class="project">{project_name}</span>'.format(project_name = self._project_name)
 
@@ -923,7 +912,11 @@ class Project(ProjectBase):
     <head>
         <link rel="stylesheet" type="text/css" href="/css/pitweb.css"/>
 
-        <title>Pitweb - {project_name}</title>
+        <style type="text/css">
+        {css}
+        </style>
+
+        <title>pitweb - {project_name}</title>
     </head>
 
     <body>
@@ -935,6 +928,91 @@ class Project(ProjectBase):
         </div>
     </body>
 </html>
-'''.format(project_name = self._project_name, header = header, menu = menu, content = content)
+'''.format(css = self.css(), project_name = self._project_name, header = header, menu = menu, content = content)
         return html
 
+
+    def css(self):
+        h = '''
+html * { font-family: sans; font-size: 13px; }
+body { padding: 5px; }
+
+hr { margin: 0px; border-width: 0px; border-top: 1px solid #999;}
+
+table tr td { vertical-align: top; padding-left: 4px; padding-right: 4px; }
+table tr.header { font-weight: bold; font-size: 15px; }
+table tr.title td { padding: 3px; padding-left: 7px; font-size: 16px; font-weight: bold; background-color: #edece6; }
+table tr:hover { background-color: #fbfaf7; }
+
+a { color: #0000cc; text-decoration: none; } 
+a:hover { text-decoration: underline; }
+a.comment { font-weight: bold; color: #666666; }
+a.tag { display: block-inline; background-color: #ffffaa; border: 1px solid #f1ee00; color: black;
+        margin-left: 2px; margin-right: 2px;
+        padding-left: 4px; padding-right: 4px; padding-top: 1px; padding-bottom: 1px; }
+a.branch { display: block-inline; background-color: #88ff88; border: 1px solid #39ba39; color: black;
+           margin-left: 2px; margin-right: 2px;
+           padding-left: 4px; padding-right: 4px; padding-top: 1px; padding-bottom: 1px; }
+a.remote { display: block-inline; background-color: #AAAAFF; border: 1px solid #8888ff; color: black;
+           margin-left: 2px; margin-right: 2px;
+           padding-left: 4px; padding-right: 4px; padding-top: 1px; padding-bottom: 1px; }
+a.blob { color: black; }
+a.menu { font-family: sans !important; font-size: 11px !important; }
+
+div.header { padding: 7px; margin-bottom: 20px; font-size: 20px; background-color: #edece6; }
+div.header .project { font-size: 18px; }
+
+div.menu table { width: 100%; border-bottom: 3px solid #c8c8c8; }
+div.menu table tr:hover { background-color: white; }
+div.menu a { padding-top: 3px; padding-bottom: 3px; padding-left: 5px; padding-right: 5px; margin-right: 10px;
+             display: block-inline; background-color: #edece6; color: black; }
+div.menu a:hover { background-color: #c8c8c8; text-decoration: none; }
+div.menu a.sel { background-color: #c8c8c8; }
+
+div.content { margin: 15px; }
+
+div.commit-msg { font-family: monospace; white-space: pre; }
+
+div.log_nav { margin: 10px; }
+div.log_nav span.sep { margin-left: 5px; margin-right: 5px; }
+div.log_nav span { color: #555555; }
+table.log tr.log_header { font-weight: bold; font-size: 15px; }
+
+table.refs a.head { font-weight: bold; color: #469446; }
+table.refs a.ref_tag { font-weight: bold; color: #918f00; }
+table.refs a.ref_remote { font-weight: bold; color: #4747ba; }
+
+table.diff-tree tr td { font-family: monospace; font-size: 12px; }
+table.diff-tree tr td * { font-family: monospace; font-size: 12px; }
+td.diff-tree-num-changes { font-family: sans !important; font-style: italic; font-size: 13px !important; }
+td.diff-tree-A { color: green; }
+td.diff-tree-D { color: #C00000; }
+td.diff-tree-RC { color: #777; }
+span.diff-tree-RC-file { color: black; }
+td.diff-tree-menu { font-family: sans !important; }
+td.diff-tree-menu * { font-family: sans !important; }
+a.diff-tree-file { color: black; }
+
+div.patch { width: 100%; margin-bottom: 10px; }
+div.patch * { font-family: monospace; white-space: pre; font-size: 12px; }
+div.patch-header { background-color: #DDD; border-top: 1px solid #AAA; border-bottom: 1px solid #AAA;
+                   font-weight: bold; padding: 3px; }
+div.patch-index { background-color: #EEE; padding: 3px; color: #666; }
+div.patch-index a { color: #666; }
+div.patch-from-file { color: #A00; }
+div.patch-to-file { color: #007000; }
+div.patch-chunk { background-color: #fff7ff; border-top: 1px dotted #FFE0FF; margin-top: 2px; margin-bottom: 2px; }
+span.patch-chunk-range { background-color: #ffe0ff; display: block-inline; color: #909; }
+div.patch-rm { color: #A00; }
+div.patch-add { color: #007000; }
+
+table.tree tr.header * { font-family: sans; }
+table.tree * { font-family: monospace; }
+table.tree a.blob { color: black; }
+
+div.blob * { font-family: monospace; }
+div.blob { border-top: 1px solid black; }
+div.blob-line * { white-space: pre; }
+span.blob-linenum { color: #999; display: block-inline; border-right: 1px solid black; }
+        '''
+        return h
