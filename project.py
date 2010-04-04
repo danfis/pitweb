@@ -29,6 +29,15 @@ import os
 import imp
 import hashlib
 
+pygments = False
+try:
+    from pygments import highlight
+    from pygments.lexers import get_lexer_for_filename
+    from pygments.formatters import HtmlFormatter
+    pygments = True
+except:
+    pass
+
 import common
 import git
 
@@ -442,7 +451,7 @@ class Project(ProjectBase):
 
         html += self._fTreePath(path, treeid, filename, blobid)
         html += '<br />'
-        html += self._fBlob(blob)
+        html += self._fBlob(blob, filename)
 
         self.write(self.tpl(html))
 
@@ -490,10 +499,23 @@ class Project(ProjectBase):
 
         return html
 
-    def _fBlob(self, blob):
+    def _fBlob(self, blob, filename = ''):
         html = ''
 
-        lines = blob.data.split('\n')
+        data = blob.data
+
+        lexer     = None
+        formatter = None
+        if pygments and len(filename) > 0:
+            try:
+                lexer     = get_lexer_for_filename(filename)
+                formatter = HtmlFormatter(nowrap = True, noclasses = True, style = 'trac')
+                data = highlight(data, lexer, formatter)
+            except:
+                lexer     = None
+                formatter = None
+
+        lines = data.split('\n')
         if len(lines[-1]) == 0:
             lines = lines[:-1]
         digits = int(math.ceil(math.log(len(lines), 10)))
@@ -504,10 +526,13 @@ class Project(ProjectBase):
         linepat += '</div>'
         linepat = linepat.format(digits)
 
+        if not lexer:
+            lines = map(lambda x: self._esc(x), lines)
+
         html += '<div class="blob">'
         for i in range(0, len(lines)):
             line = lines[i]
-            html += linepat.format(i + 1, self._esc(line))
+            html += linepat.format(i + 1, line)
         html += '</div>'
 
         return html
