@@ -5,16 +5,19 @@ import math
 import mimetypes
 import os
 import imp
+import hashlib
 
+import common
 import git
 
 
-class ProjectBase(object):
+class ProjectBase(common.ModPythonOutput):
     """ HTML interface for project specified by its directory. """
 
-    def __init__(self, dir, req):
+    def __init__(self, req, dir):
+        super(ProjectBase, self).__init__(req)
+
         self._dir = dir
-        self._req = req
 
         self._git = git.Git(dir)
 
@@ -36,7 +39,13 @@ class ProjectBase(object):
 
             try:
                 if file and pathname and desc:
-                    config = imp.load_module('config', file, pathname, desc)
+                    f = open(pathname, 'r')
+                    hash = hashlib.sha256(pathname + f.read())
+                    f.close()
+
+                    name = 'config-' + hash.hexdigest()
+
+                    config = imp.load_module(name, file, pathname, desc)
             except Exception as e:
                 msg = "Can't load configuration file: "
                 msg += str(e)
@@ -122,12 +131,25 @@ class ProjectBase(object):
 
         return args
 
-    def _esc(self, s):
-        """ Replaces special characters in s by HTML escape sequences """
-        s = s.replace('<', '&lt;')
-        s = s.replace('>', '&gt;')
-        s = s.replace('\n', '<br />')
-        return s
+    def projectName(self):
+        return self._project_name
+
+    def owner(self, default = ''):
+        if self._owner:
+            return self._owner
+        return default
+
+    def description(self, default = ''):
+        if self._description:
+            return self._description
+        return default
+
+    def lastChange(self, default = ''):
+        commit = self._git.commit('HEAD')
+        date   = commit.committer.date
+        date   = date.format('%Y-%m-%d %H:%M:%S')
+        return date
+
 
     def run(self):
         self._section = self._a
@@ -156,22 +178,12 @@ class ProjectBase(object):
 
         return apache.OK
 
-    def write(self, s):
-        self._req.write(s)
-
-    def setContentType(self, type):
-        self._req.content_type = type
-    def setFilename(self, filename):
-        self._req.headers_out['Content-disposition'] = ' attachment; filename="{0}"'.format(filename)
-
-
 
 class Project(ProjectBase):
-    def __init__(self, dir, req):
-        super(Project, self).__init__(dir, req)
+    def __init__(self, req, dir, projects = None):
+        super(Project, self).__init__(req, dir)
 
-        self._tags, self._heads, self._remotes = self._git.refs()
-
+        self._projects = projects
 
     def _fileOut(self, data, filename):
         type = mimetypes.guess_type(filename)
@@ -497,12 +509,9 @@ class Project(ProjectBase):
             h += '</tr>'
 
         # last change
-        commit = self._git.commit('HEAD')
-        date   = commit.committer.date
-        date   = date.format('%Y-%m-%d %H:%M:%S')
         h += '<tr>'
         h += '<td>Last change</td>'
-        h += '<td>' + date + '</td>'
+        h += '<td>' + self.lastChange() + '</td>'
         h += '</tr>'
 
         # homepage
@@ -993,7 +1002,12 @@ class Project(ProjectBase):
 
 
     def tpl(self, content):
-        header = '<span class="project">{project_name}</span>'.format(project_name = self._project_name)
+        header = ''
+        if self._projects:
+            header += '<a href="{0}">projects</a>'.format(self._projects)
+            header += '&nbsp;/&nbsp;'
+
+        header += '<span class="project">{project_name}</span>'.format(project_name = self._project_name)
 
         sections = ['summary', 'log', 'refs', 'commit', 'diff', 'tree']
         menu = ''
@@ -1018,8 +1032,6 @@ class Project(ProjectBase):
         html = '''
 <html>
     <head>
-        <link rel="stylesheet" type="text/css" href="/css/pitweb.css"/>
-
         <style type="text/css">
         {css}
         </style>
@@ -1071,7 +1083,7 @@ a.blob { color: black; }
 a.menu { font-family: sans !important; font-size: 11px !important; }
 
 div.header { padding: 7px; margin-bottom: 20px; font-size: 20px; background-color: #edece6; }
-div.header .project { font-size: 18px; }
+div.header * { font-size: 18px; }
 
 div.menu table { width: 100%; border-bottom: 3px solid #c8c8c8; }
 div.menu table tr:hover { background-color: white; }
