@@ -741,8 +741,12 @@ class Project(ProjectBase):
 
         for d in diff_trees:
             path = d.to_file.rsplit('/', 1)
-            blobpath     = path[0]
-            blobfilename = path[1]
+            if len(path) == 2:
+                blobpath     = path[0]
+                blobfilename = path[1]
+            else:
+                blobpath = '/'
+                blobfilename = d.to_file
 
             blobv = { 'a'        : 'blob',
                       'id'       : self._id,
@@ -824,21 +828,29 @@ class Project(ProjectBase):
         # header line
         m = pat_head.match(lines[cur])
         if m:
-            path = d.to_file.rsplit('/', 1)
-            blobpath     = path[0]
-            blobfilename = path[1]
+            path = d.from_file.rsplit('/', 1)
+            if len(path) == 2:
+                blobpath     = path[0]
+                blobfilename = path[1]
+            else:
+                blobpath = '/'
+                blobfilename = d.to_file
             blobv1 = { 'a'        : 'blob',
                        'id'       : self._id,
-                       'blobid'   : d.to_id,
+                       'blobid'   : d.from_id,
                        'path'     : blobpath,
                        'filename' : blobfilename }
 
-            path = d.from_file.rsplit('/', 1)
-            blobpath     = path[0]
-            blobfilename = path[1]
+            path = d.to_file.rsplit('/', 1)
+            if len(path) == 2:
+                blobpath     = path[0]
+                blobfilename = path[1]
+            else:
+                blobpath = '/'
+                blobfilename = d.to_file
             blobv2 = { 'a'        : 'blob',
                        'id'       : self._id,
-                       'blobid'   : d.from_id,
+                       'blobid'   : d.to_id,
                        'path'     : blobpath,
                        'filename' : blobfilename }
 

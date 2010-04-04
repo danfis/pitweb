@@ -320,6 +320,21 @@ class GitObj(object):
         else:
             return '----------'
 
+    def fileType(self, mode):
+        if mode == 0:
+            return ''
+
+        if self.modeIsGitlink(mode):
+            return "submodule";
+        elif stat.S_ISDIR(mode):
+            return 'directory'
+        elif stat.S_ISREG(mode):
+            return 'file'
+        elif stat.S_ISLNK(mode):
+            return 'symlink'
+        else:
+            return 'unknown'
+
 class GitCommit(GitObj):
     def __init__(self, git, id, tree, parents, author, committer, comment):
         super(GitCommit, self).__init__(git, id)
@@ -384,20 +399,6 @@ class GitDiffTree(GitObj):
 
         if len(self.similarity) > 0:
             self.similarity = '{0}%'.format(int(self.similarity))
-
-    def fileType(self, mode):
-        if mode == 0:
-            return ''
-
-        # TODO S_ISGITLINK
-        if stat.S_ISDIR(mode):
-            return 'directory'
-        elif stat.S_ISREG(mode):
-            return 'file'
-        elif stat.S_ISLNK(mode):
-            return 'symlink'
-        else:
-            return 'unknown'
 
 class GitTree(GitObj):
     def __init__(self, git, id, name, mode, size):
