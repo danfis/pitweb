@@ -4,6 +4,7 @@ import re
 import math
 import mimetypes
 import os
+import imp
 
 import git
 
@@ -17,8 +18,75 @@ class ProjectBase(object):
 
         self._git = git.Git(dir)
 
-        self._setProjectName()
+        self._errors = []
 
+        self._config()
+        self._params()
+
+    def _config(self):
+        config = None
+
+        # Load configuration from file
+        if os.path.exists(os.path.join(self._dir, 'pitweb.py')):
+            file = pathname = desc = None
+            try:
+                file, pathname, desc = imp.find_module('pitweb', [self._dir]) 
+            except ImportError:
+                pass
+
+            try:
+                if file and pathname and desc:
+                    config = imp.load_module('config', file, pathname, desc)
+            except Exception as e:
+                msg = "Can't load configuration file: "
+                msg += str(e)
+                self._errors.append(msg)
+
+        self._setProjectName(config)
+        self._commits_per_page = self._configParam(config, 'commits_per_page', 50)
+        self._commits_in_summary = self._configParam(config, 'commits_in_summary', 15)
+        self._description = self._configParam(config, 'description', None)
+        self._owner = self._configParam(config, 'owner', None)
+        self._urls = self._configParam(config, 'urls', [])
+        self._homepage = self._configParam(config, 'homepage', None)
+        self._setSnapshots(config)
+
+    def _configParam(self, config, name, default):
+        if config and hasattr(config, name):
+            return getattr(config, name)
+        return default
+
+    def _setProjectName(self, config):
+        name = self._configParam(config, 'project_name', None)
+        if name:
+            self._project_name = name
+            return
+
+        name = ''
+
+        p = self._dir.split('/')
+        p = filter(lambda x: len(x) > 0, p)
+        if len(p) > 0:
+            name = p[-1]
+            if len(name) > 4 and name[-4:] == '.git':
+                name = name[:-4]
+
+        self._project_name = name
+
+    def _setSnapshots(self, config):
+        snapshots = self._configParam(config, 'snapshots', ['tgz', 'tbz2'])
+
+        # filter invalid values
+        snapshots = filter(lambda x: x in ['tgz', 'tbz2', 'txz', 'zip'], snapshots)
+
+        self._snapshots = snapshots
+
+        self._snapshots_map = { 'tgz'  : '.tar.gz',
+                                'tbz2' : '.tar.bz2',
+                                'txz'  : '.tar.xz',
+                                'zip'  : '.zip' }
+
+    def _params(self):
         args = self._parseArgs()
         self._a       = args.get('a', 'summary')
         self._id      = args.get('id', 'HEAD')
@@ -35,21 +103,6 @@ class ProjectBase(object):
         self._page    = int(args.get('page', '1'))
         self._path    = args.get('path', '')
         self._format  = args.get('format', 'tgz')
-
-        self._commits_per_page = 50
-
-    def _setProjectName(self):
-        name = ''
-
-        p = self._dir.split('/')
-        p = filter(lambda x: len(x) > 0, p)
-        if len(p) > 0:
-            name = p[-1]
-            if len(name) > 4 and name[-4:] == '.git':
-                name = name[:-4]
-
-        self._project_name = name
-
 
     def _parseArgs(self):
         args = {}
@@ -68,11 +121,6 @@ class ProjectBase(object):
                 args[s[0]] = s[1]
 
         return args
-
-    def setProjectName(self, name):
-        self._project_name = name
-    def setCommitsPerPage(self, p):
-        self._commits_per_page = p
 
     def _esc(self, s):
         """ Replaces special characters in s by HTML escape sequences """
@@ -218,10 +266,13 @@ class Project(ProjectBase):
 
     def summary(self):
         tags, heads, remotes = self._git.refs()
-        commits = self._git.revList('HEAD', max_count = 15)
+        commits = self._git.revList('HEAD', max_count = self._commits_in_summary)
         commits = self._git.commitsSetRefs(commits, tags, heads, remotes)
 
         html = ''
+
+        html +=  self._fSummaryInfo()
+        html += '<br />'
 
         if len(heads) > 0:
             html += self._fHeads(heads)
@@ -428,6 +479,57 @@ class Project(ProjectBase):
         return html
 
 
+    def _fSummaryInfo(self):
+        h = '<table class="summary-info">'
+
+        # description
+        if self._description:
+            h += '<tr>'
+            h += '<td>Description</td>'
+            h += '<td>' + self._esc(self._description) + '</td>'
+            h += '</tr>'
+
+        # owner
+        if self._owner:
+            h += '<tr>'
+            h += '<td>Owner</td>'
+            h += '<td>' + self._esc(self._owner) + '</td>'
+            h += '</tr>'
+
+        # last change
+        commit = self._git.commit('HEAD')
+        date   = commit.committer.date
+        date   = date.format('%Y-%m-%d %H:%M:%S')
+        h += '<tr>'
+        h += '<td>Last change</td>'
+        h += '<td>' + date + '</td>'
+        h += '</tr>'
+
+        # homepage
+        if self._homepage:
+            a = '<a href="{0}">{1}</a>'.format(self._homepage, self._esc(self._homepage))
+            h += '<tr>'
+            h += '<td>Homepage</td>'
+            h += '<td>' + a + '</td>'
+            h += '</tr>'
+
+        # urls
+        if len(self._urls) > 0:
+            h += '<tr>'
+            h += '<td>URL</td>'
+            h += '<td>' + self._esc(self._urls[0]) + '</td>'
+            h += '</tr>'
+
+            for u in self._urls[1:]:
+                h += '<tr>'
+                h += '<td></td>'
+                h += '<td>' + self._esc(u) + '</td>'
+                h += '</tr>'
+
+        h += '</table>'
+
+        return h
+
 
     def _fHeads(self, heads):
         html = '''
@@ -540,17 +642,16 @@ class Project(ProjectBase):
         return html
 
     def _fSnapshotLinks(self, id):
-        v = { 'a'      : 'snapshot',
-              'id'     : id,
-              'format' : 'tgz' }
-
         html = ''
-        html += self.anchor('.tar.gz', v = v, cls = 'menu')
 
-        html += ',&nbsp;'
+        anchors = []
+        for s in self._snapshots:
+            v = { 'a'      : 'snapshot',
+                  'id'     : id,
+                  'format' : s }
+            anchors.append(self.anchor(self._snapshots_map[s], v = v, cls = 'menu'))
 
-        v['format'] = 'tbz2'
-        html += self.anchor('.tar.bz2', v = v, cls = 'menu')
+        html += string.join(anchors, ',&nbsp;')
 
         return html
 
@@ -907,6 +1008,13 @@ class Project(ProjectBase):
             menu += self.anchor(sec, v = v, cls = cls)
         menu = '<table><tr><td>' + menu + '</td></tr></table>'
 
+        errors = ''
+        if len(self._errors) > 0:
+            for e in self._errors:
+                errors += '<div class="error">'
+                errors += e
+                errors += '</div>'
+
         html = '''
 <html>
     <head>
@@ -920,6 +1028,7 @@ class Project(ProjectBase):
     </head>
 
     <body>
+        {errors}
         <div class="header">{header}</div>
         <div class="menu">{menu}</div>
 
@@ -928,7 +1037,9 @@ class Project(ProjectBase):
         </div>
     </body>
 </html>
-'''.format(css = self.css(), project_name = self._project_name, header = header, menu = menu, content = content)
+'''.format(css = self.css(), errors = errors,
+           project_name = self._project_name,
+           header = header, menu = menu, content = content)
         return html
 
 
@@ -1014,5 +1125,7 @@ div.blob * { font-family: monospace; }
 div.blob { border-top: 1px solid black; }
 div.blob-line * { white-space: pre; }
 span.blob-linenum { color: #999; display: block-inline; border-right: 1px solid black; }
+
+div.error { color: #A00; font-size: 12px; font-weight: bold; margin-bottom: 10px; }
         '''
         return h
