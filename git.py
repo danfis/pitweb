@@ -593,7 +593,7 @@ class Git(object):
 
             patch += line + '\n'
 
-        if len(patch) > 0:
+        if len(patch) > 0 and cur < len(diff_trees):
             diff_trees[cur].patch = patch
 
     def _parsePerson(self, line):
