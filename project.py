@@ -996,10 +996,10 @@ class Project(ProjectBase):
         cur += 1
 
         if cur < length:
-            html += '<div class="patch-from-file">' + lines[cur] + '</div>'
+            html += '<div class="patch-from-file">' + self._esc(lines[cur]) + '</div>'
             cur += 1
         if cur < length:
-            html += '<div class="patch-to-file">' + lines[cur] + '</div>'
+            html += '<div class="patch-to-file">' + self._esc(lines[cur]) + '</div>'
             cur += 1
 
         for line in lines[cur:]:
@@ -1012,11 +1012,11 @@ class Project(ProjectBase):
                 continue
 
             if len(line) > 0 and line[0] == '-':
-                html += '<div class="patch-rm">' + line + '</div>'
+                html += '<div class="patch-rm">' + self._esc(line) + '</div>'
             elif len(line) > 0 and line[0] == '+':
-                html += '<div class="patch-add">' + line + '</div>'
+                html += '<div class="patch-add">' + self._esc(line) + '</div>'
             else:
-                html += '<div class="patch-line">' + line + '</div>'
+                html += '<div class="patch-line">' + self._esc(line) + '</div>'
 
         html += '</div>'
 
