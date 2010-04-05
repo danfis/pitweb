@@ -511,6 +511,11 @@ class Git(object):
     def tree(self, id):
         s = self._git.lsTree(id, long = True, zeroterm = True)
 
+        # try to detect older version of git which does not know --long
+        # option and in this case simply omit size
+        if s.startswith('usage'):
+            s = self._git.lsTree(id, zeroterm = True)
+
         objs = []
 
         lines = s.split('\x00')
@@ -547,12 +552,19 @@ class Git(object):
 
 
     def _parseTree(self, line):
-        p = line.split()
-
-        if p[1] == 'tree':
-            obj = GitTree(self, id = p[2], mode = p[0], size = p[3], name = p[4])
+        data, name = line.split('\t', 1)
+        p = data.split()
+        mode = p[0]
+        type = p[1]
+        id   = p[2]
+        size = ''
+        if len(p) > 3:
+            size = p[3]
+            
+        if type == 'tree':
+            obj = GitTree(self, id = id, mode = mode, size = size, name = name)
         else:
-            obj = GitBlob(self, id = p[2], mode = p[0], size = p[3], name = p[4])
+            obj = GitBlob(self, id = id, mode = mode, size = size, name = name)
 
         return obj
 
