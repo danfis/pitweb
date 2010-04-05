@@ -518,7 +518,10 @@ class Project(ProjectBase):
         lines = data.split('\n')
         if len(lines[-1]) == 0:
             lines = lines[:-1]
-        digits = int(math.ceil(math.log(len(lines), 10)))
+
+        digits = 0
+        if len(lines) > 0:
+            digits = int(math.ceil(math.log(len(lines), 10)))
 
         linepat = '<div class="blob-line">'
         linepat += '<span class="blob-linenum"> {{0: >{0}d}} </span>'
