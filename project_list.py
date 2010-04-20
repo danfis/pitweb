@@ -31,6 +31,9 @@ class ProjectListBase(common.ModPythonOutput):
     def __init__(self, req, projects = []):
         super(ProjectListBase, self).__init__(req)
 
+        # set default content-type to text/html
+        self.setContentType('text/html')
+
         self._projects = projects
 
 
