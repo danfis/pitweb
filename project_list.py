@@ -28,13 +28,14 @@ import common
 
 
 class ProjectListBase(common.ModPythonOutput):
-    def __init__(self, req, projects = []):
+    def __init__(self, req, projects = [], basepath = '/'):
         super(ProjectListBase, self).__init__(req)
 
         # set default content-type to text/html
         self.setContentType('text/html')
 
         self._projects = projects
+        self._basepath = basepath
 
 
     def _uri(self):
@@ -71,7 +72,7 @@ class ProjectListBase(common.ModPythonOutput):
             last_change = self._esc(prj.lastChange())
 
             html += '<tr>'
-            html += '<td><a href="/{0}">{0}</a></td>'.format(name)
+            html += '<td><a href="{0}{1}">{1}</a></td>'.format(self._basepath, name)
             html += '<td>{0}</td>'.format(owner)
             html += '<td>{0}</td>'.format(desc)
             html += '<td>{0}</td>'.format(last_change)
@@ -135,11 +136,11 @@ class ProjectListDir(ProjectListBase):
         as project.
     """
 
-    def __init__(self, req, dir):
-        projects = self._projects(req, dir)
-        super(ProjectListDir, self).__init__(req, projects)
+    def __init__(self, req, dir, basepath = '/'):
+        projects = self._projects(req, dir, basepath)
+        super(ProjectListDir, self).__init__(req, projects, basepath = basepath)
 
-    def _projects(self, req, parent_dir):
+    def _projects(self, req, parent_dir, basepath):
         projects = []
 
         dirs = os.listdir(parent_dir)
@@ -147,6 +148,6 @@ class ProjectListDir(ProjectListBase):
             path   = os.path.join(parent_dir, dir)
             config = os.path.join(path, 'pitweb.py')
             if os.path.isdir(path) and os.path.isfile(config):
-                projects.append(Project(req, path, '/'))
+                projects.append(Project(req, path, basepath))
 
         return projects
