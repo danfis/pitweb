@@ -17,6 +17,10 @@ commits_per_page = 50
 # Default value is 15
 commits_in_summary = 15
 
+### Maximal length of one line comment (shown for example in log)
+# Default value is 50
+one_line_comment_max_len = 50
+
 ### Description of project - will be shown in summary
 description = 'Some description of your project'
 

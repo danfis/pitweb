@@ -89,6 +89,7 @@ class ProjectBase(common.ModPythonOutput):
         self._owner = self._configParam(config, 'owner', None)
         self._urls = self._configParam(config, 'urls', [])
         self._homepage = self._configParam(config, 'homepage', None)
+        self._one_line_comment_max_len = self._configParam(config, 'one_line_comment_max_len', 50)
         self._setSnapshots(config)
 
     def _configParam(self, config, name, default):
@@ -605,7 +606,10 @@ class Project(ProjectBase):
             comm = h.commit()
 
             line = self._esc(comm.commentFirstLine())
+            if len(line) > self._one_line_comment_max_len:
+                line = line[:self._one_line_comment_max_len] + '...'
             line = line.replace('{', '{{').replace('}', '}}')
+
             v = { 'a'  : 'log',
                   'id' : comm.id }
             commanchor = self.anchor(line, v = v, cls = 'comment')
@@ -679,6 +683,8 @@ class Project(ProjectBase):
             comm = r.commit()
 
             line = self._esc(comm.commentFirstLine())
+            if len(line) > self._one_line_comment_max_len:
+                line = line[:self._one_line_comment_max_len] + '...'
             line = line.replace('{', '{{').replace('}', '}}')
 
             v = { 'a'  : 'log',
@@ -767,6 +773,8 @@ class Project(ProjectBase):
             <td>'''
 
             line = self._esc(commit.commentFirstLine())
+            if not showmsg and len(line) > self._one_line_comment_max_len:
+                line = line[:self._one_line_comment_max_len] + '...'
             line = line.replace('{', '{{')
             line = line.replace('}', '}}')
 
