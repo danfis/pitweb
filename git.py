@@ -75,7 +75,7 @@ class GitComm(object):
         return out
 
     def revList(self, obj = 'HEAD', parents = False, header = False,
-                      max_count = -1):
+                      max_count = -1, all = False):
         """ git-rev-list(1)
                 Lists commit objects in reverse chronological order.
         """
@@ -89,7 +89,11 @@ class GitComm(object):
         if max_count > 0:
             comm.append('--max-count={0}'.format(max_count))
 
-        comm.append(obj)
+        if not all and obj:
+            comm.append(obj)
+        if all:
+            comm.append('--all')
+
         return self._git(comm)
 
     def forEachRef(self, format = None, sort = None, pattern = None):
@@ -401,10 +405,10 @@ class Git(object):
         self._git = GitComm(dir, gitbin)
         self._patterns = patterns
 
-    def revList(self, obj = 'HEAD', max_count = -1):
+    def revList(self, obj = 'HEAD', max_count = -1, all = False):
         # get raw data
         res = self._git.revList(obj, parents = True, header = True,
-                                     max_count = max_count)
+                                     max_count = max_count, all = all)
 
         # split into hunks (each corresponding with one commit)
         commits_str = res.split('\x00')

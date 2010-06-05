@@ -177,10 +177,12 @@ class ProjectBase(common.ModPythonOutput):
         return default
 
     def lastChange(self, default = ''):
-        commit = self._git.commit('HEAD')
-        date   = commit.committer.date
-        date   = date.format('%Y-%m-%d %H:%M:%S')
-        return date
+        commits = self._git.revList(None, all = True, max_count = 1)
+        if len(commits) > 0:
+            date   = commits[0].committer.date
+            date   = date.format('%Y-%m-%d %H:%M:%S')
+            return date
+        return ''
 
 
     def run(self):
