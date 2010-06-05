@@ -624,7 +624,9 @@ class Project(ProjectBase):
             html += '<td>' + nameanchor + '</td>'
             html += '<td>' + commanchor + '</td>'
             html += '<td><i>' + comm.author.name() + '</i></td>'
-            html += '<td>' + comm.author.date.format('%Y-%m-%d') + '</td>'
+            html += '<td title="' + comm.author.date.format('%Y-%m-%d %H:%M:%S') +'">'
+            html +=   comm.author.date.format('%Y-%m-%d')
+            html += '</td>'
             html += '<td>' + '</td>'
             html += '</tr>'
 
@@ -655,7 +657,9 @@ class Project(ProjectBase):
             html += '<td>' + nameanchor + '</td>'
             html += '<td>' + self._esc(t.msg) + '</td>'
             html += '<td><i>' + self._esc(t.tagger.name()) + '</i></td>'
-            html += '<td>' + t.tagger.date.format('%Y-%m-%d') + '</td>'
+            html += '<td title="' + t.tagger.date.format('%Y-%m-%d %H:%M:%S') + '">'
+            html +=   t.tagger.date.format('%Y-%m-%d')
+            html += '</td>'
 
             html += '<td>'
             html += self._fMenuLinks(t.name, t.id)
@@ -701,7 +705,9 @@ class Project(ProjectBase):
             html += '<td>' + nameanchor + '</td>'
             html += '<td>' + commanchor + '</td>'
             html += '<td><i>' + self._esc(comm.author.name()) + '</i></td>'
-            html += '<td>' + comm.author.date.format('%Y-%m-%d') + '</td>'
+            html += '<td title="' + comm.author.date.format('%Y-%m-%d %H:%M:%S') + '">'
+            html +=   comm.author.date.format('%Y-%m-%d')
+            html += '</td>'
             html += '<td>' + '</td>'
             html += '</tr>'
 
@@ -770,7 +776,7 @@ class Project(ProjectBase):
         for commit in commits:
             h = '''
         <tr>
-            <td>{date}</td>
+            <td title="{date_full}">{date}</td>
             <td><i>{author}</i></td>
             <td>'''
 
@@ -805,6 +811,8 @@ class Project(ProjectBase):
 
             html += h.format(id          = commit.id,
                              author      = self._esc(commit.author.name()),
+                             date_full   =
+                             commit.author.date.format('%Y-%m-%d %H:%M:%S'),
                              date        = commit.author.date.format('%Y-%m-%d'),
                              longcomment = longcomment,
                              tree        = commit.tree)
