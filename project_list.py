@@ -143,7 +143,7 @@ class ProjectListDir(ProjectListBase):
     def _projects(self, req, parent_dir, basepath):
         projects = []
 
-        dirs = os.listdir(parent_dir)
+        dirs = sorted(os.listdir(parent_dir), key=str.lower)
         for dir in dirs:
             path   = os.path.join(parent_dir, dir)
             config = os.path.join(path, 'pitweb.py')
