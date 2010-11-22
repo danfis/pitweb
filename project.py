@@ -474,7 +474,7 @@ class Project(ProjectBase):
         return self._fileOut(data, filename)
 
     def pull(self, path):
-        if path.find('..') < 0:
+        if path.find('..') >= 0:
             self._setStatus(apache.HTTP_NOT_FOUND)
             return
 
