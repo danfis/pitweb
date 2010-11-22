@@ -53,6 +53,7 @@ class ProjectBase(common.ModPythonOutput):
         self._git = git.Git(dir)
 
         self._errors = []
+        self._status = apache.OK
 
         self._config()
         self._params()
@@ -126,6 +127,9 @@ class ProjectBase(common.ModPythonOutput):
                                 'tbz2' : '.tar.bz2',
                                 'txz'  : '.tar.xz',
                                 'zip'  : '.zip' }
+
+    def _setStatus(self, s):
+        self._status = s
 
     def _params(self):
         args = self._parseArgs()
@@ -209,8 +213,10 @@ class ProjectBase(common.ModPythonOutput):
             self.blobRaw(blobid = self._blobid, filename = self._filename)
         elif self._a == 'snapshot':
             self.snapshot(id = self._id, format = self._format)
+        elif self._a == 'pull':
+            self.pull(id = self._id, path = self._path)
 
-        return apache.OK
+        return self._status
 
 
 class Project(ProjectBase):
@@ -467,7 +473,14 @@ class Project(ProjectBase):
         (data, filename) = self._git.archive(id, self._project_name, format)
         return self._fileOut(data, filename)
 
-
+    def pull(self, id, path):
+        fn = self._dir + '/' + path
+        try:
+            f = open(fn, 'r')
+            c = f.read()
+            self.write(c)
+        except:
+            self._setStatus(apache.HTTP_NOT_FOUND)
 
     def _fTreePath(self, path, treeid, blobname = None, blobid = None):
         html = ''
