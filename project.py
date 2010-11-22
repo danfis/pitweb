@@ -214,7 +214,7 @@ class ProjectBase(common.ModPythonOutput):
         elif self._a == 'snapshot':
             self.snapshot(id = self._id, format = self._format)
         elif self._a == 'pull':
-            self.pull(id = self._id, path = self._path)
+            self.pull(path = self._path)
 
         return self._status
 
@@ -473,7 +473,11 @@ class Project(ProjectBase):
         (data, filename) = self._git.archive(id, self._project_name, format)
         return self._fileOut(data, filename)
 
-    def pull(self, id, path):
+    def pull(self, path):
+        if path.find('..') < 0:
+            self._setStatus(apache.HTTP_NOT_FOUND)
+            return
+
         fn = self._dir + '/' + path
         try:
             f = open(fn, 'r')
