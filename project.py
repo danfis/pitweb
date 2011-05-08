@@ -2,6 +2,7 @@
 # pitweb - Web interface for git repository written in python
 # ------------------------------------------------------------
 # Copyright (c)2010 Daniel Fiser <danfis@danfis.cz>
+#           (c)2011  David Guerizec <david@guerizec.net>
 #
 #
 #  This file is part of pitweb.
@@ -1117,6 +1118,7 @@ class Project(ProjectBase):
         html = '''
 <html>
     <head>
+        <meta http-equiv="content-type" content="application/xhtml+xml; charset=utf-8"/>
         <style type="text/css">
         {css}
         </style>

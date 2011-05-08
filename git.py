@@ -1,7 +1,8 @@
 ##
 # pitweb - Web interface for git repository written in python
 # ------------------------------------------------------------
-# Copyright (c)2010 Daniel Fiser <danfis@danfis.cz>
+# Copyright (c)2010 Daniel Fiser <danfis@danfis.cz>,
+#           (c)2011 David Guerizec <david@guerizec.net>
 #
 #
 #  This file is part of pitweb.
@@ -428,7 +429,7 @@ class Git(object):
         return c[0]
 
     def refs(self):
-        format  = '%(objectname) %(objecttype) %(refname)'
+        format  = '%(objectname) %(objecttype) %(refname) <%(*objectname)> %(subject)%00%(creator)'
 
         tags    = []
         heads   = []
@@ -438,12 +439,10 @@ class Git(object):
         res = self._git.forEachRef(format = format, sort = '-*authordate', pattern = 'refs/tags')
         lines = res.split('\n')
         for line in lines:
-            d = line.split(' ')
-            if len(d) != 3:
-                continue
+            tag = self._parseTag(line)
+            if tag:
+                tags.append(tag)
 
-            s = self._git.catFile(d[0], type = 'tag')
-            tags.append(self._parseTag(d[0], s))
 
         # heads, remotes
         res = self._git.forEachRef(format = format,
@@ -452,7 +451,7 @@ class Git(object):
         lines = res.split('\n')
         for line in lines:
             d = line.split(' ')
-            if len(d) != 3:
+            if len(d) < 3:
                 continue
 
             if d[2][:11] == 'refs/heads/':
@@ -661,31 +660,38 @@ class Git(object):
                                  comment = comment)
         return commit
 
-    def _parseTag(self, id, s):
-        lines = s.split('\n')
+    def _parseTag(self, s):
+        lines = s.split('\x00')
 
-        readmsg = False
+        if len(lines) != 2:
+            return None
 
-        objid = ''
-        name  = ''
-        msg   = ''
-        tagger = None
+        try:
+            (objectname, objecttype, refname,
+                    pobjectname, msg) = lines[0].split(' ', 4)
+        except:
+            return None
 
-        for line in lines:
-            if readmsg:
-                msg += line
-                break # read only first line
-            elif line[:6] == 'object':
-                objid = line[7:]
-            elif line[:4] == 'tag ':
-                name = line[4:]
-            elif line[:6] == 'tagger':
-                tagger = self._parsePerson(line)
-            elif len(line) == 0:
-                readmsg = True
-                
+        try:
+            (tagger, date, tz) = lines[1].rsplit(' ', 2)
+        except:
+            return None
+
+        id = objectname
+        if objecttype == "commit":
+            # this is a lightweight tag
+            objid = objectname
+        else:
+            objid = pobjectname[1:-1]
+
+        # remove "refs/tags/"
+        name = refname[10:]
+
         if not tagger:
             tagger = self._parsePerson('')
+        else:
+            tagger = self._parsePerson("tagger: "+lines[1])
 
         tag = GitTag(self, id = id, objid = objid, name = name, msg = msg, tagger = tagger)
         return tag
+
